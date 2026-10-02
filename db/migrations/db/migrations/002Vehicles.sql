@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS vehicles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    brand VARCHAR(50) NOT NULL,
+    model VARCHAR(50) NOT NULL,
+    connector_type VARCHAR(20) NOT NULL,
+    max_power_kw DECIMAL(5,1) NOT NULL,
+    battery_capacity_kwh DECIMAL(5,1) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
