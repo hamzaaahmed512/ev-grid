@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-export const metadata: Metadata = {title:'EV Grid — Power Your Journey',description:'Discover, reserve, and share EV charging stations across Pakistan.',icons:{icon:'/ev-grid-logo.png'}};
+import './responsive.css';
+export const metadata: Metadata = {title:'EV Grid — Power Your Journey',description:'Discover, reserve, and share EV charging stations across Pakistan.',icons:{icon:'/ev-grid-logo.webp'}};
 export const viewport: Viewport = {width:"device-width",initialScale:1,viewportFit:"cover"};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}</body></html>}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><head><link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><link rel="preload" href="/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/></head><body>{children}</body></html>}
