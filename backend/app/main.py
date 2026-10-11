@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -7,7 +9,7 @@ from app.models.station import Station
 
 # ⭐ YEH LINE ZAROORI HAI: Uvicorn 'app.main:app' mein is 'app' ko dhoondhta hai
 app = FastAPI(
-    title="VoltRelay API",
+    title="EV Grid API",
     description="EV Charging Management & Recommendation Platform API",
     version="1.0.0"
 )
@@ -15,7 +17,9 @@ app = FastAPI(
 # CORS Middleware (Frontend communication ke liye)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[origin.strip() for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:3000,https://ev-grid-eta.vercel.app"
+    ).split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,7 +28,7 @@ app.add_middleware(
 # 1. Health Endpoint
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "project": "VoltRelay"}
+    return {"status": "ok", "project": "EV Grid"}
 
 # 2. Get All Stations (Supabase Data)
 @app.get("/stations")
