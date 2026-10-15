@@ -131,11 +131,34 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    const detail =
-      (data as { detail?: string | { msg: string }[] })?.detail;
+    const errorObj = data as Record<string, unknown> | null;
+
     let message = `HTTP ${response.status}`;
-    if (typeof detail === "string") message = detail;
-    else if (Array.isArray(detail) && detail[0]?.msg) message = detail[0].msg;
+    if (typeof errorObj?.detail === "string") {
+      message = errorObj.detail;
+    } else if (Array.isArray(errorObj?.detail) && errorObj.detail.length > 0) {
+      const first = errorObj.detail[0] as { msg?: string };
+      if (first?.msg) message = first.msg;
+    } else if (
+      errorObj?.detail &&
+      typeof errorObj.detail === "object" &&
+      !Array.isArray(errorObj.detail) &&
+      "msg" in errorObj.detail &&
+      typeof (errorObj.detail as { msg?: unknown }).msg === "string"
+    ) {
+      message = (errorObj.detail as { msg: string }).msg;
+    } else if (typeof errorObj?.message === "string") {
+      message = errorObj.message;
+    } else if (typeof errorObj?.error_description === "string") {
+      message = errorObj.error_description;
+    } else if (typeof errorObj?.error === "string") {
+      message = errorObj.error;
+    } else if (response.status === 401) {
+      message = "Invalid email or password.";
+    } else if (response.status === 400) {
+      message = "Invalid request. Please check your inputs.";
+    }
+
     throw new ApiError(response.status, message);
   }
 

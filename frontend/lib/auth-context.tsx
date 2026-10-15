@@ -19,8 +19,8 @@ import {
   clearToken,
   getStoredUser,
   setStoredUser,
+  ApiError,
   type ApiUser,
-  type ApiError,
 } from './api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -83,8 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStoredUser(res.user);
         setUser(res.user);
         return null;
-      } catch (err) {
-        return (err as ApiError).detail ?? 'Signup failed. Please try again.';
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          return err.detail || err.message;
+        }
+        return (err as { detail?: string; message?: string })?.detail ?? (err as { message?: string })?.message ?? 'Signup failed. Please try again.';
       }
     },
     [],
@@ -98,8 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStoredUser(res.user);
         setUser(res.user);
         return null;
-      } catch (err) {
-        return (err as ApiError).detail ?? 'Login failed. Please try again.';
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          return err.detail || err.message;
+        }
+        return (err as { detail?: string; message?: string })?.detail ?? (err as { message?: string })?.message ?? 'Login failed. Please try again.';
       }
     },
     [],
