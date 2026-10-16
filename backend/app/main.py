@@ -9,16 +9,12 @@ from app.routers import auth
 
 # Initialize FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="VoltRelay — EV Charging Management & Recommendation Platform API",
-    version=settings.VERSION
+    title="EV Grid API",
+    description="EV Charging Management & Recommendation Platform API",
+    version="1.0.0"
 )
 
-# ==========================================
-# CORS Middleware
-# NOTE: Cannot combine allow_credentials=True with allow_origins=["*"].
-# Use explicit origins from settings instead.
-# ==========================================
+# CORS Middleware (Frontend communication ke liye)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
