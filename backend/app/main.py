@@ -13,7 +13,13 @@ app = FastAPI(
     description="EV Charging Management & Recommendation Platform API",
     version="1.0.0"
 )
-
+@app.get("/")
+def home():
+    return {
+        "status": "success",
+        "message": "EV Grid API is running",
+        "version": settings.VERSION
+    }
 # CORS Middleware (Frontend communication ke liye)
 app.add_middleware(
     CORSMiddleware,
