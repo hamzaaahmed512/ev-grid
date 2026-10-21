@@ -1,11 +1,11 @@
 /* Mobile first. Breakpoints reflect card and navigation content capacity. */
-@font-face{font-family:'DM Sans';font-style:normal;font-weight:100 1000;font-display:swap;src:url('/fonts/dm-sans-latin.woff2') format('woff2')}
 @font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('/fonts/manrope-latin.woff2') format('woff2')}
-@font-face{font-family:'DM Sans Fallback';src:local('Arial');ascent-override:94.90%;descent-override:29.66%;line-gap-override:0%;size-adjust:104.53%}
 @font-face{font-family:'Manrope Fallback';src:local('Arial');ascent-override:103.31%;descent-override:29.07%;line-gap-override:0%;size-adjust:103.19%}
 html{font-size:100%;scroll-padding-top:6rem}
-:root{--muted:#52695c;--font-dm-sans:'DM Sans','DM Sans Fallback';--font-manrope:'Manrope','Manrope Fallback'}
-body{font-size:1rem;line-height:1.6}
+:root{--muted:#52695c;--font-manrope:'Manrope','Manrope Fallback'}
+body{font-family:var(--font-manrope),Arial,sans-serif;font-size:1rem;line-height:1.6}
+/* Keep dashboard values and table columns easy to scan. */
+.stat>strong,.detail-price,.summary-total,table{font-variant-numeric:tabular-nums}
 .skip-link{position:fixed;top:0;left:1rem;z-index:200;transform:translateY(-120%);background:white;color:var(--dark);padding:.75rem 1rem}
 .skip-link:focus{transform:none}
 *,*::before,*::after{box-sizing:border-box}
