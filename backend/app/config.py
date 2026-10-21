@@ -8,6 +8,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 class Settings:
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "").strip()
     
     # Security / JWT Settings
     SECRET_KEY: str = os.getenv("SECRET_KEY", "fallback-secret-key-change-this-2025")

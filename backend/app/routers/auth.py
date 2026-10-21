@@ -1,13 +1,54 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+import secrets
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserSignup, UserLogin, UserResponse, TokenResponse
+from app.schemas.user import UserSignup, UserLogin, GoogleLogin, UserResponse, TokenResponse
+from app.core.google_auth import verify_google_credential
 from app.core.security import hash_password, verify_password, create_access_token
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_login(credentials: GoogleLogin, db: Session = Depends(get_db)):
+    claims = verify_google_credential(credentials.credential)
+    subject = claims["sub"]
+    email = claims["email"].strip().lower()
+    user = db.query(User).filter(User.google_sub == subject).first()
+    if user is None:
+        user = db.query(User).filter(func.lower(User.email) == email).first()
+        if user is not None:
+            # Google is authoritative for Gmail and managed Workspace emails.
+            # A verified third-party email alone must not grant account access.
+            authoritative = email.endswith("@gmail.com") or bool(claims.get("hd"))
+            if not authoritative or user.google_sub not in (None, subject):
+                raise HTTPException(409, "This email already has an account. Please sign in with your existing method.")
+            user.google_sub = subject
+        else:
+            user = User(
+                name=(claims.get("name") or email.split("@")[0])[:100],
+                email=email,
+                google_sub=subject,
+                # Preserve the existing NOT NULL schema without a usable password.
+                password_hash=hash_password(secrets.token_urlsafe(32)),
+            )
+            db.add(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(409, "Account changed during sign-in. Please try again.")
+    return {
+        "access_token": create_access_token(data={"sub": str(user.id), "email": user.email}),
+        "token_type": "bearer",
+        "user": user,
+    }
 
 # ==========================================
 # 1. SIGNUP ENDPOINT

@@ -14,6 +14,9 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class GoogleLogin(BaseModel):
+    credential: str = Field(..., min_length=1, max_length=10000)
+
 # ==========================================
 # 2. RESPONSE SCHEMAS (Data sent TO frontend)
 # ==========================================

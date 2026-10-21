@@ -34,6 +34,7 @@ export interface AuthState {
   signup(name: string, email: string, password: string): Promise<string | null>;
   /** Log in an existing user — returns error string on failure */
   login(email: string, password: string): Promise<string | null>;
+  googleLogin(credential: string): Promise<string | null>;
   /** Clear token & user state */
   logout(): void;
 }
@@ -111,13 +112,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const googleLogin = useCallback(async (credential: string): Promise<string | null> => {
+    try {
+      const res = await authApi.google(credential);
+      setToken(res.access_token);
+      setStoredUser(res.user);
+      setUser(res.user);
+      return null;
+    } catch (err: unknown) {
+      return err instanceof ApiError ? err.detail : 'Google sign-in failed. Please try again.';
+    }
+  }, []);
+
   const logout = useCallback(() => {
     clearToken();
     setUser(undefined);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signup, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, signup, login, googleLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

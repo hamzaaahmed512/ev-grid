@@ -168,6 +168,13 @@ async function request<T>(
 // ── Auth endpoints ─────────────────────────────────────────────────────────────
 
 export const authApi = {
+  google(credential: string): Promise<AuthResponse> {
+    return request<AuthResponse>("/auth/google", {
+      method: "POST",
+      body: { credential },
+      public: true,
+    });
+  },
   /**
    * POST /auth/signup
    * Body: { name, email, password }

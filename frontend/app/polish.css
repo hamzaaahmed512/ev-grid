@@ -114,6 +114,11 @@ p { text-wrap: pretty; }
 .auth-form > p { font-size: .9375rem; margin-bottom: 1.75rem; }
 .auth-tabs button, .workspace-roles button, .tab { font-size: .8125rem; font-weight: 650; }
 .auth-tabs { background: #eff3f0; }
+.google-sign-in { margin-bottom: 1.25rem; }
+.google-button-container { min-height: 44px; display: flex; justify-content: center; width: 100%; }
+.google-button-container[aria-busy="true"] { opacity: .6; pointer-events: none; }
+.google-sign-in .small-note { text-align: center; margin-block: .5rem; }
+.google-sign-in .auth-divider { margin-block: 1.25rem; }
 .auth-art { background: radial-gradient(ellipse at top left, #2b7751, transparent 70%), #123e2c; }
 .auth-messaging h1 { line-height: 1.2; text-wrap: balance; }
 th { font-size: .6875rem; letter-spacing: .08em; font-weight: 750; color: #52695d; background: #f6f9f7; }
