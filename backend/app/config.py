@@ -1,8 +1,9 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load variables from .env file
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 class Settings:
     # Database
@@ -15,8 +16,13 @@ class Settings:
     
     # CORS (Frontend permissions)
     ALLOWED_ORIGINS: list = [
-        origin.strip() 
-        for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+        origin.strip().rstrip("/")
+        for origin in (
+            os.getenv("ALLOWED_ORIGINS")
+            or os.getenv("CORS_ORIGINS")
+            or "http://localhost:3000,http://127.0.0.1:3000,https://ev-grid-eta.vercel.app"
+        ).split(",")
+        if origin.strip()
     ]
     
     # Application Info
