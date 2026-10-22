@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy
+python-dotenv
+psycopg2-binary
+psycopg[binary]
+bcrypt
+python-jose[cryptography]
+email-validator
+pydantic[email]
+google-auth[requests]>=2.0,<3
