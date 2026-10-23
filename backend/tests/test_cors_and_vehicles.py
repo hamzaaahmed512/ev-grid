@@ -32,16 +32,21 @@ class ASGIResponse:
         return json.loads(self.body)
 
 
-def perform_request(asgi_app, method, path, headers=None):
+def perform_request(asgi_app, method, path, headers=None, body=None):
     async def send_request():
         messages = []
         request_sent = False
+        request_body = json.dumps(body).encode() if body is not None else b""
 
         async def receive():
             nonlocal request_sent
             if not request_sent:
                 request_sent = True
-                return {"type": "http.request", "body": b"", "more_body": False}
+                return {
+                    "type": "http.request",
+                    "body": request_body,
+                    "more_body": False,
+                }
             return {"type": "http.disconnect"}
 
         async def send(message):
@@ -71,7 +76,7 @@ def perform_request(asgi_app, method, path, headers=None):
             if not any(message["type"] == "http.response.start" for message in messages):
                 raise
         start = next(message for message in messages if message["type"] == "http.response.start")
-        body = b"".join(
+        response_body = b"".join(
             message.get("body", b"")
             for message in messages
             if message["type"] == "http.response.body"
@@ -80,7 +85,7 @@ def perform_request(asgi_app, method, path, headers=None):
             name.decode().lower(): value.decode()
             for name, value in start["headers"]
         }
-        return ASGIResponse(start["status"], response_headers, body)
+        return ASGIResponse(start["status"], response_headers, response_body)
 
     return asyncio.run(send_request())
 
@@ -169,6 +174,30 @@ class VehicleCorsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.headers["access-control-allow-origin"], FRONTEND_ORIGIN)
         self.assertEqual(response.json()[0]["model"], "H6")
+
+    def test_vehicle_create_works_with_healthy_database_and_cors(self):
+        response = perform_request(
+            app,
+            "POST",
+            "/vehicles/",
+            {
+                "Origin": FRONTEND_ORIGIN,
+                "Content-Type": "application/json",
+            },
+            {
+                "make": "Haval",
+                "model": "H6",
+                "year": 2026,
+                "battery_capacity_kwh": 60.0,
+                "connector_type": "CCS2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.headers["access-control-allow-origin"], FRONTEND_ORIGIN)
+        self.assertEqual(response.json()["make"], "Haval")
+        self.assertEqual(response.json()["year"], 2026)
+        self.assertEqual(self.db.query(Vehicle).count(), 1)
 
     def test_preflight_allows_vehicle_get_and_auth_headers(self):
         response = perform_request(
