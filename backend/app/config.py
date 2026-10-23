@@ -16,15 +16,19 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
     
     # CORS (Frontend permissions)
-    ALLOWED_ORIGINS: list = [
-        origin.strip().rstrip("/")
-        for origin in (
-            os.getenv("ALLOWED_ORIGINS")
-            or os.getenv("CORS_ORIGINS")
-            or "http://localhost:3000,http://127.0.0.1:3000,https://ev-grid-eta.vercel.app"
-        ).split(",")
-        if origin.strip()
-    ]
+    _configured_origins = (
+        os.getenv("ALLOWED_ORIGINS")
+        or os.getenv("CORS_ORIGINS")
+        or "http://localhost:3000,http://127.0.0.1:3000"
+    )
+    ALLOWED_ORIGINS: list = list(dict.fromkeys(
+        [
+            origin.strip().rstrip("/")
+            for origin in _configured_origins.split(",")
+            if origin.strip()
+        ]
+        + ["https://ev-grid-eta.vercel.app"]
+    ))
     
     # Application Info
     PROJECT_NAME: str = "VoltRelay API"
