@@ -242,3 +242,77 @@ export const healthApi = {
     return request("/health", { public: true });
   },
 };
+// ── Vehicle endpoints ──────────────────────────────────────────────────────────
+
+export interface ApiVehicle {
+  id: number;
+  user_id: number;
+  make: string;
+  model: string;
+  year: number;
+  battery_capacity_kwh: number;
+  connector_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleCreateInput {
+  make: string;
+  model: string;
+  year: number;
+  battery_capacity_kwh: number;
+  connector_type: string;
+}
+
+export interface VehicleUpdateInput {
+  make?: string;
+  model?: string;
+  year?: number;
+  battery_capacity_kwh?: number;
+  connector_type?: string;
+}
+
+export const vehicleApi = {
+  /**
+   * GET /vehicles/ — List all vehicles owned by current user
+   */
+  list(): Promise<ApiVehicle[]> {
+    return request<ApiVehicle[]>("/vehicles/");
+  },
+
+  /**
+   * GET /vehicles/:id — Get vehicle by ID
+   */
+  get(id: number): Promise<ApiVehicle> {
+    return request<ApiVehicle>(`/vehicles/${id}`);
+  },
+
+  /**
+   * POST /vehicles/ — Register a new vehicle
+   */
+  create(data: VehicleCreateInput): Promise<ApiVehicle> {
+    return request<ApiVehicle>("/vehicles/", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /**
+   * PUT /vehicles/:id — Update existing vehicle
+   */
+  update(id: number, data: VehicleUpdateInput): Promise<ApiVehicle> {
+    return request<ApiVehicle>(`/vehicles/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  /**
+   * DELETE /vehicles/:id — Delete a vehicle
+   */
+  delete(id: number): Promise<{ message: string; id?: number }> {
+    return request<{ message: string; id?: number }>(`/vehicles/${id}`, {
+      method: "DELETE",
+    });
+  },
+};

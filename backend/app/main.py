@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.station import Station
-from app.routers import auth
+from app.routers import auth, vehicles
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -31,6 +31,7 @@ app.add_middleware(
 
 # Register Routers
 app.include_router(auth.router)
+app.include_router(vehicles.router)
 
 # ==========================================
 # CORE ENDPOINTS
