@@ -113,8 +113,11 @@ async function request<T>(
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  } catch (err) {
-    throw new ApiError(0, "Network error — is the API server running?");
+  } catch {
+    throw new ApiError(
+      0,
+      "Unable to reach the API. Check your network and API URL; a CORS or server availability issue may also be blocking the request.",
+    );
   }
 
   // Handle empty bodies (204 No Content, etc.)
@@ -122,24 +125,32 @@ async function request<T>(
 
   let data: unknown;
   try {
-    data = await response.json();
+    const responseText = await response.text();
+    data = JSON.parse(responseText);
   } catch {
-    if (!response.ok) {
-      throw new ApiError(response.status, `HTTP ${response.status}`);
-    }
-    return undefined as T;
+    const message = response.status >= 500
+      ? "The server could not complete this request. Please try again later."
+      : "The API returned an invalid JSON response.";
+    throw new ApiError(response.status, `HTTP ${response.status}: ${message}`);
   }
 
   if (!response.ok) {
     const errorObj = data as Record<string, unknown> | null;
 
-    let message = `HTTP ${response.status}`;
-    if (typeof errorObj?.detail === "string") {
+    let message = response.status >= 500
+      ? "The server could not complete this request. Please try again later."
+      : "The request failed.";
+    if (response.status < 500 && typeof errorObj?.detail === "string") {
       message = errorObj.detail;
-    } else if (Array.isArray(errorObj?.detail) && errorObj.detail.length > 0) {
+    } else if (
+      response.status < 500 &&
+      Array.isArray(errorObj?.detail) &&
+      errorObj.detail.length > 0
+    ) {
       const first = errorObj.detail[0] as { msg?: string };
       if (first?.msg) message = first.msg;
     } else if (
+      response.status < 500 &&
       errorObj?.detail &&
       typeof errorObj.detail === "object" &&
       !Array.isArray(errorObj.detail) &&
@@ -147,19 +158,18 @@ async function request<T>(
       typeof (errorObj.detail as { msg?: unknown }).msg === "string"
     ) {
       message = (errorObj.detail as { msg: string }).msg;
-    } else if (typeof errorObj?.message === "string") {
+    } else if (response.status < 500 && typeof errorObj?.message === "string") {
       message = errorObj.message;
-    } else if (typeof errorObj?.error_description === "string") {
+    } else if (
+      response.status < 500 &&
+      typeof errorObj?.error_description === "string"
+    ) {
       message = errorObj.error_description;
-    } else if (typeof errorObj?.error === "string") {
+    } else if (response.status < 500 && typeof errorObj?.error === "string") {
       message = errorObj.error;
-    } else if (response.status === 401) {
-      message = "Invalid email or password.";
-    } else if (response.status === 400) {
-      message = "Invalid request. Please check your inputs.";
     }
 
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, `HTTP ${response.status}: ${message}`);
   }
 
   return data as T;

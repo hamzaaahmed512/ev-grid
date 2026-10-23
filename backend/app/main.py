@@ -20,15 +20,6 @@ def home():
         "message": "EV Grid API is running",
         "version": settings.VERSION
     }
-# CORS Middleware (Frontend communication ke liye)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Register Routers
 app.include_router(auth.router)
 app.include_router(vehicles.router)
@@ -90,3 +81,14 @@ def get_station_by_id(station_id: int, db: Session = Depends(get_db)):
         "price_per_kwh": float(s.price_per_kwh) if s.price_per_kwh is not None else None,
         "created_at": s.created_at.isoformat() if s.created_at else None,
     }
+
+
+# Wrap the complete FastAPI stack so CORS headers are also added to generated 500 responses.
+fastapi_app = app
+app = CORSMiddleware(
+    app=fastapi_app,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)

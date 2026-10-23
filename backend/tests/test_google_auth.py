@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 from app.database import Base
 from app.models.user import User
+from app.models.vehicle import Vehicle  # Register the User relationship target.
 from app.schemas.user import GoogleLogin
 from app.core.google_auth import verify_google_credential
 from app.core.security import decode_access_token
