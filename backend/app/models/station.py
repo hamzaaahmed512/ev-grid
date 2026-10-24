@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -14,3 +15,4 @@ class Station(Base):
     status = Column(String(30), default="AVAILABLE")
     price_per_kwh = Column(Numeric(6, 2), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    connectors = relationship("Connector", back_populates="station", cascade="all, delete-orphan")
