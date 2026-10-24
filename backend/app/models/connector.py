@@ -15,10 +15,22 @@ class Connector(Base):
     id = Column(Integer, primary_key=True, index=True)
     station_id = Column(Integer, ForeignKey("stations.id", ondelete="CASCADE"), nullable=False)
     connector_type = Column(String(50), nullable=False, index=True)
-    max_power_kw = Column(Numeric(6, 2), nullable=False, default=50.00)
-    price_per_kwh = Column(Numeric(6, 2), nullable=False, default=45.00)
-    status = Column(String(20), nullable=False, default="AVAILABLE")
+    power_kw = Column(Numeric(5, 1), nullable=False, default=50.00)
+    status = Column(String(30), nullable=False, default="AVAILABLE")
+    charging_type = Column(String(5), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationship back to Station
     station = relationship("Station", back_populates="connectors")
+
+    @property
+    def max_power_kw(self):
+        """Compatibility property for max_power_kw."""
+        return self.power_kw
+
+    @property
+    def price_per_kwh(self):
+        """Retrieve price from the parent station."""
+        if self.station and self.station.price_per_kwh is not None:
+            return self.station.price_per_kwh
+        return 0.00

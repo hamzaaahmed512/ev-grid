@@ -16,13 +16,23 @@ from app.models.connector import Connector
 router = APIRouter(prefix="/stations", tags=["Stations"])
 
 
-def serialize_connector(c: Any) -> dict:
+def serialize_connector(c: Any, station_price: Any = None) -> dict:
     """Helper to format database Connector object into clean JSON."""
+    power = getattr(c, "power_kw", None)
+    if power is None:
+        power = getattr(c, "max_power_kw", 0.0)
+
+    price = getattr(c, "price_per_kwh", None)
+    if price is None:
+        price = station_price
+
     return {
         "id": c.id,
         "connector_type": c.connector_type,
-        "max_power_kw": float(c.max_power_kw) if c.max_power_kw is not None else 0.0,
-        "price_per_kwh": float(c.price_per_kwh) if c.price_per_kwh is not None else 0.0,
+        "power_kw": float(power) if power is not None else 0.0,
+        "max_power_kw": float(power) if power is not None else 0.0,
+        "charging_type": getattr(c, "charging_type", None),
+        "price_per_kwh": float(price) if price is not None else 0.0,
         "status": c.status,
     }
 
@@ -41,7 +51,8 @@ def serialize_station(s: Any, matching_connector_type: str | None = None) -> dic
     connectors_list = []
     if hasattr(s, "connectors") and s.connectors:
         for c in s.connectors:
-            connectors_list.append(serialize_connector(c))
+            connectors_list.append(serialize_connector(c, station_price=price))
+
 
     # Determine if compatible with requested filter
     is_compatible = True

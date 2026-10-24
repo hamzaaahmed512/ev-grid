@@ -15,32 +15,14 @@ app = FastAPI(
 )
 
 # =============================================================================
-# 2. Configure CORS (Cross-Origin Resource Sharing) Middleware
-# Allows Next.js frontend (localhost:3000) to communicate with FastAPI
-# =============================================================================
-allowed_origins = getattr(
-    settings, 
-    "ALLOWED_ORIGINS", 
-    ["http://localhost:3000", "https://voltrelay.vercel.app"]
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# =============================================================================
-# 3. Mount Modular Application Routers
+# 2. Mount Modular Application Routers
 # =============================================================================
 app.include_router(auth.router)
 app.include_router(vehicles.router)
 app.include_router(stations.router)
 
 # =============================================================================
-# 4. Core System Endpoints
+# 3. Core System Endpoints
 # =============================================================================
 @app.get("/", tags=["Core"])
 def home():
@@ -59,3 +41,18 @@ def health_check():
         "status": "ok",
         "project": getattr(settings, "PROJECT_NAME", "VoltRelay"),
     }
+
+
+# =============================================================================
+# 4. Wrap with Outer CORS Middleware
+# Wrapping the FastAPI stack ensures CORS headers are attached to all responses,
+# including unhandled 500 server errors.
+# =============================================================================
+fastapi_app = app
+app = CORSMiddleware(
+    app=fastapi_app,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
