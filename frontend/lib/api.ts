@@ -296,7 +296,7 @@ export const stationApi = {
     }
 
     const queryString = queryParams.toString();
-    const url = queryString ? `/stations?${queryString}` : "/stations";
+    const url = queryString ? `/stations/?${queryString}` : "/stations/";
 
     return request<ApiStation[]>(url, {
       public: true,
