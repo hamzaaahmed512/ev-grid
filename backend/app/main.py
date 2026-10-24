@@ -1,94 +1,61 @@
-from fastapi import FastAPI, Depends, HTTPException
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_db
-from app.models.station import Station
-from app.routers import auth, vehicles
+from app.routers import auth, vehicles, stations
 
-# Initialize FastAPI app
+# =============================================================================
+# 1. Initialize FastAPI Application
+# =============================================================================
 app = FastAPI(
-    title="EV Grid API",
+    title="VoltRelay API",
     description="EV Charging Management & Recommendation Platform API",
-    version="1.0.0"
+    version=getattr(settings, "VERSION", "1.0.0"),
 )
-@app.get("/")
-def home():
-    return {
-        "status": "success",
-        "message": "EV Grid API is running",
-        "version": settings.VERSION
-    }
-# Register Routers
+
+# =============================================================================
+# 2. Configure CORS (Cross-Origin Resource Sharing) Middleware
+# Allows Next.js frontend (localhost:3000) to communicate with FastAPI
+# =============================================================================
+allowed_origins = getattr(
+    settings, 
+    "ALLOWED_ORIGINS", 
+    ["http://localhost:3000", "https://voltrelay.vercel.app"]
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =============================================================================
+# 3. Mount Modular Application Routers
+# =============================================================================
 app.include_router(auth.router)
 app.include_router(vehicles.router)
+app.include_router(stations.router)
 
-# ==========================================
-# CORE ENDPOINTS
-# ==========================================
-
-@app.get("/health")
-def health_check():
-    """Health check endpoint to verify API server is running."""
-    return {"status": "ok", "project": settings.PROJECT_NAME}
-
-@app.get("/stations")
-def get_all_stations(
-    city: str | None = None,
-    status: str | None = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Fetch all charging stations from Supabase.
-    Supports optional ?city= and ?status= query filters.
-    """
-    query = db.query(Station)
-    if city:
-        query = query.filter(Station.city.ilike(f"%{city}%"))
-    if status:
-        query = query.filter(Station.status == status.upper())
-    stations = query.all()
-    return [
-        {
-            "id": s.id,
-            "name": s.name,
-            "city": s.city,
-            "address": s.address,
-            "latitude": float(s.latitude) if s.latitude is not None else None,
-            "longitude": float(s.longitude) if s.longitude is not None else None,
-            "status": s.status,
-            "price_per_kwh": float(s.price_per_kwh) if s.price_per_kwh is not None else None,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-        }
-        for s in stations
-    ]
-
-@app.get("/stations/{station_id}")
-def get_station_by_id(station_id: int, db: Session = Depends(get_db)):
-    """Fetch a single station by its ID."""
-    s = db.query(Station).filter(Station.id == station_id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Station not found")
+# =============================================================================
+# 4. Core System Endpoints
+# =============================================================================
+@app.get("/", tags=["Core"])
+def home():
+    """Root health and version endpoint."""
     return {
-        "id": s.id,
-        "name": s.name,
-        "city": s.city,
-        "address": s.address,
-        "latitude": float(s.latitude) if s.latitude is not None else None,
-        "longitude": float(s.longitude) if s.longitude is not None else None,
-        "status": s.status,
-        "price_per_kwh": float(s.price_per_kwh) if s.price_per_kwh is not None else None,
-        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "status": "success",
+        "message": "VoltRelay API is running",
+        "version": getattr(settings, "VERSION", "1.0.0"),
     }
 
 
-# Wrap the complete FastAPI stack so CORS headers are also added to generated 500 responses.
-fastapi_app = app
-app = CORSMiddleware(
-    app=fastapi_app,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
-)
+@app.get("/health", tags=["Core"])
+def health_check():
+    """Service status health check endpoint for monitoring."""
+    return {
+        "status": "ok",
+        "project": getattr(settings, "PROJECT_NAME", "VoltRelay"),
+    }
