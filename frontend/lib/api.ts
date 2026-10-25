@@ -132,6 +132,50 @@ export interface VehicleUpdateInput {
   connector_type?: string;
 }
 
+// ─── Booking Types (Module 4) ────────────────────────────────────────────────
+export type BookingStatus = "CONFIRMED" | "CANCELLED" | "COMPLETED";
+
+export interface ApiBookingVehicle {
+  id: number;
+  name: string;
+  connector_type: string;
+}
+
+export interface ApiBookingStation {
+  id: number;
+  name: string;
+  city?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface ApiBookingConnector {
+  id: number;
+  connector_type: string;
+  max_power_kw: number;
+  price_per_kwh: number;
+}
+
+export interface ApiBooking {
+  id: number;
+  status: BookingStatus;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  vehicle: ApiBookingVehicle;
+  station: ApiBookingStation;
+  connector: ApiBookingConnector;
+  created_at?: string | null;
+}
+
+export interface BookingCreateInput {
+  vehicle_id: number;
+  connector_id: number;
+  start_time: string;
+  duration_minutes: number;
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // API Error
 // ──────────────────────────────────────────────────────────────────────────────
@@ -361,7 +405,25 @@ export const vehicleApi = {
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Health API
+// Bookings API (Module 4)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const bookingApi = {
+  async list(status?: BookingStatus): Promise<ApiBooking[]> {
+    const q = status ? `?status=${status}` : "";
+    const data = await request<{ count: number; bookings: ApiBooking[] }>(`/bookings/${q}`);
+    return data?.bookings ?? [];
+  },
+  create(data: BookingCreateInput): Promise<ApiBooking> {
+    return request<ApiBooking>("/bookings/", { method: "POST", body: data });
+  },
+  cancel(id: number): Promise<ApiBooking> {
+    return request<ApiBooking>(`/bookings/${id}/cancel`, { method: "PUT" });
+  },
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+//or Health API
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const healthApi = {

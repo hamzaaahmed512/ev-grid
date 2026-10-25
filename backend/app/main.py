@@ -1,9 +1,8 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, vehicles, stations
+from app.routers import auth, vehicles, stations, bookings
 
 # =============================================================================
 # 1. Initialize FastAPI Application
@@ -20,6 +19,7 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(vehicles.router)
 app.include_router(stations.router)
+app.include_router(bookings.router)
 
 # =============================================================================
 # 3. Core System Endpoints
@@ -55,4 +55,4 @@ app = CORSMiddleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+)
