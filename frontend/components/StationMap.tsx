@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { stationApi, ApiStation } from '../lib/api';
 import BookingModal from './BookingModal';
+<<<<<<< HEAD
 import type { Station } from '../lib/data';
 
 type Props = {
@@ -12,6 +13,23 @@ type Props = {
   onSelect: (id: number) => void;
 };
 
+=======
+
+export type Station = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  available: boolean;
+};
+
+type Props = {
+  stations: Station[];
+  selected: number | null;
+  onSelect: (id: number) => void;
+};
+
+>>>>>>> c2537541213b141dce15cfc33e8bc95797ec87ae
 export default function StationMap({ stations, selected, onSelect }: Props) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<import('leaflet').Map | null>(null);
@@ -53,10 +71,15 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
       markers.current.forEach(x => x.remove());
       markers.current = stations.map(s => {
         const active = s.id === selected;
+<<<<<<< HEAD
         // Handle both boolean or number check for availability safely
         const isAvailable = typeof s.available === 'number' ? s.available > 0 : Boolean(s.available);
         const icon = L.divIcon({
           html: `<div style="background:${active ? '#14532d' : isAvailable ? '#16a34a' : '#f59e0b'};width:44px;height:44px;border-radius:50%;border:3px solid white;box-shadow:0 4px 15px #0003;color:white;display:grid;place-items:center;font-size:17px;font-weight:800">⚡</div>`,
+=======
+        const icon = L.divIcon({
+          html: `<div style="background:${active ? '#14532d' : s.available ? '#16a34a' : '#f59e0b'};width:44px;height:44px;border-radius:50%;border:3px solid white;box-shadow:0 4px 15px #0003;color:white;display:grid;place-items:center;font-size:17px;font-weight:800">⚡</div>`,
+>>>>>>> c2537541213b141dce15cfc33e8bc95797ec87ae
           className: '',
           iconSize: [44, 44],
           iconAnchor: [22, 22]
@@ -86,7 +109,10 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
   }, [stations, selected, onSelect]);
 
   const selectedStation = stations.find(s => s.id === selected);
+<<<<<<< HEAD
   const isSelectedAvailable = selectedStation ? (typeof selectedStation.available === 'number' ? selectedStation.available > 0 : Boolean(selectedStation.available)) : false;
+=======
+>>>>>>> c2537541213b141dce15cfc33e8bc95797ec87ae
 
   const handleOpenBooking = async () => {
     if (!selected) return;
@@ -113,8 +139,13 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
               <h4 className="font-bold text-gray-800">{selectedStation.name}</h4>
               <p className="text-xs text-gray-500">ID: #{selectedStation.id}</p>
             </div>
+<<<<<<< HEAD
             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${isSelectedAvailable ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
               {isSelectedAvailable ? 'Available' : 'Busy'}
+=======
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${selectedStation.available ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+              {selectedStation.available ? 'Available' : 'Busy'}
+>>>>>>> c2537541213b141dce15cfc33e8bc95797ec87ae
             </span>
           </div>
           <button
