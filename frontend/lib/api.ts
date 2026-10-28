@@ -132,8 +132,8 @@ export interface VehicleUpdateInput {
   connector_type?: string;
 }
 
-// ─── Booking Types (Module 4) ────────────────────────────────────────────────
-export type BookingStatus = "CONFIRMED" | "CANCELLED" | "COMPLETED";
+// ─── Booking Types (Module 4 & 5) ────────────────────────────────────────────
+export type BookingStatus = "CONFIRMED" | "CANCELLED" | "COMPLETED" | "IN_PROGRESS";
 
 export interface ApiBookingVehicle {
   id: number;
@@ -174,6 +174,60 @@ export interface BookingCreateInput {
   connector_id: number;
   start_time: string;
   duration_minutes: number;
+}
+
+// ─── Charging Session & Live Types (Module 5) ───────────────────────────────
+export interface ApiChargingSession {
+  id: number;
+  connector_id: number;
+  booking_id?: number | null;
+  user_id?: number | null;
+  status: "ACTIVE" | "COMPLETED" | "FAULTED";
+  started_at: string;
+  ended_at?: string | null;
+  duration_minutes?: number;
+  soc_start?: number | null;
+  soc_end?: number | null;
+  kwh_delivered: number;
+  peak_power_kw: number;
+  cost: number;
+  stop_reason?: string | null;
+  station_name?: string | null;
+  connector_type?: string | null;
+}
+
+export interface ApiActiveSessionSummary {
+  session_id: number;
+  started_at: string;
+  duration_minutes: number;
+  kwh_delivered: number;
+  current_power_kw: number;
+  soc?: number | null;
+  cost: number;
+}
+
+export interface ApiConnectorLive {
+  connector_id: number;
+  station_id: number;
+  charger_id?: string | null;
+  status: string;
+  current_power_kw: number;
+  last_seen?: string | null;
+  active_session?: ApiActiveSessionSummary | null;
+}
+
+export interface ApiLiveEvent {
+  event: "connector_status" | "session_meter" | "booking_status";
+  connector_id?: number;
+  station_id?: number;
+  status?: string;
+  power_kw?: number;
+  ts?: string;
+  session_id?: number;
+  kwh?: number;
+  soc?: number;
+  cost?: number;
+  booking_id?: number;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -423,7 +477,39 @@ export const bookingApi = {
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
-//or Health API
+// Sessions & Connectors Live API (Module 5)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const sessionApi = {
+  async me(skip = 0, limit = 50): Promise<ApiChargingSession[]> {
+    const data = await request<{ count: number; sessions: ApiChargingSession[] }>(
+      `/sessions/me?skip=${skip}&limit=${limit}`
+    );
+    return data?.sessions ?? [];
+  },
+
+  get(id: number): Promise<ApiChargingSession> {
+    return request<ApiChargingSession>(`/sessions/${id}`);
+  },
+
+  stop(id: number): Promise<{ ok: boolean; session_id: number; message: string }> {
+    return request<{ ok: boolean; session_id: number; message: string }>(
+      `/sessions/${id}/stop`,
+      { method: "POST" }
+    );
+  },
+};
+
+export const connectorApi = {
+  live(id: number): Promise<ApiConnectorLive> {
+    return request<ApiConnectorLive>(`/connectors/${id}/live`, {
+      public: true,
+    });
+  },
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Health API
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const healthApi = {

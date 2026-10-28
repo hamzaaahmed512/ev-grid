@@ -69,6 +69,8 @@ def build_ack(
     error: Optional[str] = None,
     message: Optional[str] = None,
     ts: Optional[str] = None,
+    booking_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> str:
     """
     Construct a JSON ACK wire frame string terminated with a newline character.
@@ -86,6 +88,10 @@ def build_ack(
         payload["error"] = str(error)
     if message is not None:
         payload["message"] = str(message)
+    if booking_id is not None:
+        payload["booking_id"] = int(booking_id)
+    if user_id is not None:
+        payload["user_id"] = int(user_id)
 
     return json.dumps(payload, separators=(",", ":")) + "\n"
 

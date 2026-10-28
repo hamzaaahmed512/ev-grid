@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, vehicles, stations, bookings
+from app.routers import auth, vehicles, stations, bookings, sessions, connectors
+from app.realtime import router as realtime_router
 from app.gateway import tcp_server
 
 logger = logging.getLogger("app.main")
@@ -41,6 +42,9 @@ app.include_router(auth.router)
 app.include_router(vehicles.router)
 app.include_router(stations.router)
 app.include_router(bookings.router)
+app.include_router(sessions.router)
+app.include_router(connectors.router)
+app.include_router(realtime_router)
 
 # =============================================================================
 # 3. Core System Endpoints

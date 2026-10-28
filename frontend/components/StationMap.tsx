@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { stationApi, ApiStation } from '../lib/api';
 import BookingModal from './BookingModal';
+import { useLiveStations } from '../lib/useLiveStations';
 
 export type Station = {
   id: number;
@@ -11,6 +12,9 @@ export type Station = {
   lat: number;
   lng: number;
   available: boolean | number;
+  connectors?: any[];
+  liveStatus?: "AVAILABLE" | "OCCUPIED" | "OFFLINE" | "FAULTED";
+  livePowerKw?: number;
 };
 
 type Props = {
@@ -27,6 +31,9 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [apiStation, setApiStation] = useState<ApiStation | null>(null);
   const [loadingStation, setLoadingStation] = useState(false);
+
+  // Real-time connector and meter states from WebSocket
+  const { connectorStates } = useLiveStations();
 
   useEffect(() => {
     let alive = true;
@@ -60,9 +67,42 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
       markers.current.forEach(x => x.remove());
       markers.current = stations.map(s => {
         const active = s.id === selected;
-        const isAvailable = typeof s.available === 'number' ? s.available > 0 : Boolean(s.available);
+
+        // Resolve status with live WebSocket overrides
+        let markerColor = '#16a34a'; // default green
+
+        // Check connectors for live status
+        const stationConnectors = s.connectors || [];
+        const liveStatuses = stationConnectors.map((c: any) => {
+          const cId = typeof c === 'object' && c !== null ? c.id : undefined;
+          const liveC = cId ? connectorStates[cId] : undefined;
+          const rawStatus = (typeof c === 'object' && c !== null ? c.status : undefined) || 'AVAILABLE';
+          return (liveC ? liveC.status : rawStatus).toUpperCase();
+        });
+
+        if (liveStatuses.length > 0) {
+          if (liveStatuses.some(st => st === 'AVAILABLE')) {
+            markerColor = '#16a34a'; // Green: at least one is AVAILABLE
+          } else if (liveStatuses.every(st => st === 'OCCUPIED')) {
+            markerColor = '#dc2626'; // Red: all are OCCUPIED
+          } else if (liveStatuses.every(st => st === 'OFFLINE' || st === 'FAULTED')) {
+            markerColor = '#6b7280'; // Grey: all are OFFLINE or FAULTED
+          } else {
+            markerColor = '#f59e0b'; // Amber: mixed or busy
+          }
+        } else {
+          // Fallback to static available field
+          const isAvail = typeof s.available === 'number' ? s.available > 0 : Boolean(s.available);
+          markerColor = isAvail ? '#16a34a' : '#f59e0b';
+        }
+
+        if (active) {
+          // Highlight border or darkened shade for active selection
+          markerColor = '#14532d';
+        }
+
         const icon = L.divIcon({
-          html: `<div style="background:${active ? '#14532d' : isAvailable ? '#16a34a' : '#f59e0b'};width:44px;height:44px;border-radius:50%;border:3px solid white;box-shadow:0 4px 15px #0003;color:white;display:grid;place-items:center;font-size:17px;font-weight:800">⚡</div>`,
+          html: `<div style="background:${markerColor};width:44px;height:44px;border-radius:50%;border:3px solid white;box-shadow:0 4px 15px #0003;color:white;display:grid;place-items:center;font-size:17px;font-weight:800">⚡</div>`,
           className: '',
           iconSize: [44, 44],
           iconAnchor: [22, 22]
@@ -89,10 +129,49 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
     return () => {
       live = false;
     };
-  }, [stations, selected, onSelect]);
+  }, [stations, selected, onSelect, connectorStates]);
 
   const selectedStation = stations.find(s => s.id === selected);
-  const isSelectedAvailable = selectedStation ? (typeof selectedStation.available === 'number' ? selectedStation.available > 0 : Boolean(selectedStation.available)) : false;
+
+  // Resolve selected station live metrics
+  let totalLivePower = 0;
+  let hasActiveLiveTelemetry = false;
+  let selectedStatusText = 'Available';
+  let badgeColorClass = 'bg-green-100 text-green-800';
+
+  if (selectedStation) {
+    const sConns = selectedStation.connectors || [];
+    const statuses = sConns.map((c: any) => {
+      const cId = typeof c === 'object' && c !== null ? c.id : undefined;
+      const liveC = cId ? connectorStates[cId] : undefined;
+      if (liveC && liveC.power_kw > 0) {
+        totalLivePower += liveC.power_kw;
+        hasActiveLiveTelemetry = true;
+      }
+      const rawStatus = (typeof c === 'object' && c !== null ? c.status : undefined) || 'AVAILABLE';
+      return (liveC ? liveC.status : rawStatus).toUpperCase();
+    });
+
+    if (statuses.length > 0) {
+      if (statuses.some(st => st === 'AVAILABLE')) {
+        selectedStatusText = 'Available';
+        badgeColorClass = 'bg-green-100 text-green-800';
+      } else if (statuses.every(st => st === 'OCCUPIED')) {
+        selectedStatusText = 'In Use';
+        badgeColorClass = 'bg-red-100 text-red-800';
+      } else if (statuses.every(st => st === 'OFFLINE' || st === 'FAULTED')) {
+        selectedStatusText = 'Offline / Fault';
+        badgeColorClass = 'bg-gray-100 text-gray-800';
+      } else {
+        selectedStatusText = 'Busy';
+        badgeColorClass = 'bg-amber-100 text-amber-800';
+      }
+    } else {
+      const isAvail = typeof selectedStation.available === 'number' ? selectedStation.available > 0 : Boolean(selectedStation.available);
+      selectedStatusText = isAvail ? 'Available' : 'Busy';
+      badgeColorClass = isAvail ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800';
+    }
+  }
 
   const handleOpenBooking = async () => {
     if (!selected) return;
@@ -111,7 +190,7 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
   return (
     <div className="relative w-full h-full min-h-[400px]">
       <div className="map-surface w-full h-full" ref={node} aria-label="Charging station map" />
-      
+
       {selectedStation && (
         <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-white rounded-xl shadow-xl p-4 z-[1000] border border-gray-100 flex flex-col space-y-2">
           <div className="flex justify-between items-start">
@@ -119,10 +198,18 @@ export default function StationMap({ stations, selected, onSelect }: Props) {
               <h4 className="font-bold text-gray-800">{selectedStation.name}</h4>
               <p className="text-xs text-gray-500">ID: #{selectedStation.id}</p>
             </div>
-            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${isSelectedAvailable ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-              {isSelectedAvailable ? 'Available' : 'Busy'}
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${badgeColorClass}`}>
+              {selectedStatusText}
             </span>
           </div>
+
+          {hasActiveLiveTelemetry && totalLivePower > 0 && (
+            <div className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded flex items-center space-x-1">
+              <span>⚡</span>
+              <span>Live Power: {totalLivePower.toFixed(1)} kW</span>
+            </div>
+          )}
+
           <button
             onClick={handleOpenBooking}
             disabled={loadingStation}
