@@ -84,5 +84,10 @@ class Settings:
     PROJECT_NAME: str = "VoltRelay API"
     VERSION: str = "1.0.0"
 
+    # TCP Live Gateway (Module 5)
+    TCP_GATEWAY_HOST: str = os.getenv("TCP_GATEWAY_HOST", "0.0.0.0")
+    TCP_GATEWAY_PORT: int = int(os.getenv("TCP_GATEWAY_PORT", "9000"))
+    HEARTBEAT_TIMEOUT_SECONDS: int = int(os.getenv("HEARTBEAT_TIMEOUT_SECONDS", "30"))
+
 # Global settings object
 settings = Settings()

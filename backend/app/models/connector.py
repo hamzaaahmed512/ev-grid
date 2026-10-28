@@ -18,6 +18,9 @@ class Connector(Base):
     power_kw = Column(Numeric(5, 1), nullable=False, default=50.00)
     status = Column(String(30), nullable=False, default="AVAILABLE")
     charging_type = Column(String(5), nullable=True)
+    charger_id = Column(String(50), unique=True, nullable=True, index=True)
+    last_seen = Column(DateTime(timezone=True), nullable=True, index=True)
+    current_power_kw = Column(Numeric(6, 2), nullable=False, default=0.00)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationship back to Station
