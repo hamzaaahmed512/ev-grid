@@ -39,6 +39,7 @@ app = FastAPI(
 # 2. Mount Modular Application Routers
 # =============================================================================
 app.include_router(auth.router)
+app.include_router(auth.users_router)
 app.include_router(vehicles.router)
 app.include_router(stations.router)
 app.include_router(bookings.router)

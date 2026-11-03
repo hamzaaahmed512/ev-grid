@@ -21,6 +21,7 @@ import {
   setStoredUser,
   ApiError,
   type ApiUser,
+  type UserProfileUpdateInput,
 } from './api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +36,10 @@ export interface AuthState {
   /** Log in an existing user — returns error string on failure */
   login(email: string, password: string): Promise<string | null>;
   googleLogin(credential: string): Promise<string | null>;
+  /** Update user profile */
+  updateProfile(data: UserProfileUpdateInput): Promise<string | null>;
+  /** Force refresh current user from backend */
+  refreshUser(): Promise<ApiUser | null>;
   /** Clear token & user state */
   logout(): void;
 }
@@ -47,6 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // null = loading, undefined = logged-out, ApiUser = logged-in
   const [user, setUser] = useState<ApiUser | null | undefined>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = useCallback(async (): Promise<ApiUser | null> => {
+    try {
+      const me = await authApi.me();
+      setUser(me);
+      setStoredUser(me);
+      return me;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // On mount: if a token exists in localStorage, verify it with /auth/me
   useEffect(() => {
@@ -124,13 +140,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateProfile = useCallback(
+    async (data: UserProfileUpdateInput): Promise<string | null> => {
+      try {
+        const updated = await authApi.updateProfile(data);
+        setUser(updated);
+        setStoredUser(updated);
+        return null;
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          return err.detail || err.message;
+        }
+        return (err as { detail?: string; message?: string })?.detail ?? (err as { message?: string })?.message ?? 'Failed to update profile.';
+      }
+    },
+    [],
+  );
+
   const logout = useCallback(() => {
     clearToken();
     setUser(undefined);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signup, login, googleLogin, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, signup, login, googleLogin, updateProfile, refreshUser, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

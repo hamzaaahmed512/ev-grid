@@ -55,7 +55,19 @@ export interface ApiUser {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
+  city?: string | null;
+  profile_image_url?: string | null;
+  role?: string | null;
   created_at: string;
+  updated_at?: string | null;
+}
+
+export interface UserProfileUpdateInput {
+  name?: string;
+  phone?: string | null;
+  city?: string | null;
+  profile_image_url?: string | null;
 }
 
 export interface AuthResponse {
@@ -110,6 +122,12 @@ export interface ApiVehicle {
   battery_capacity_kwh: number;
   battery_kwh?: number;
   connector_type: string;
+  max_power_kw?: number | null;
+  nickname?: string | null;
+  range_km?: number | null;
+  color?: string | null;
+  license_plate?: string | null;
+  is_primary?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +139,12 @@ export interface VehicleCreateInput {
   battery_capacity_kwh: number;
   battery_kwh?: number;
   connector_type: string;
+  max_power_kw?: number | null;
+  nickname?: string | null;
+  range_km?: number | null;
+  color?: string | null;
+  license_plate?: string | null;
+  is_primary?: boolean;
 }
 
 export interface VehicleUpdateInput {
@@ -130,6 +154,12 @@ export interface VehicleUpdateInput {
   battery_capacity_kwh?: number;
   battery_kwh?: number;
   connector_type?: string;
+  max_power_kw?: number | null;
+  nickname?: string | null;
+  range_km?: number | null;
+  color?: string | null;
+  license_plate?: string | null;
+  is_primary?: boolean;
 }
 
 // ─── Booking Types (Module 4 & 5) ────────────────────────────────────────────
@@ -368,6 +398,13 @@ export const authApi = {
     return request<ApiUser>("/auth/me");
   },
 
+  updateProfile(data: UserProfileUpdateInput): Promise<ApiUser> {
+    return request<ApiUser>("/auth/profile", {
+      method: "PATCH",
+      body: data,
+    });
+  },
+
   google(credential: string): Promise<AuthResponse> {
     return request<AuthResponse>("/auth/google", {
       method: "POST",
@@ -376,6 +413,9 @@ export const authApi = {
     });
   },
 };
+
+export const getProfile = () => authApi.me();
+export const updateProfile = (data: UserProfileUpdateInput) => authApi.updateProfile(data);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Stations API
@@ -423,6 +463,10 @@ export const vehicleApi = {
     return request<ApiVehicle[]>("/vehicles/");
   },
 
+  getPrimary(): Promise<ApiVehicle> {
+    return request<ApiVehicle>("/vehicles/primary");
+  },
+
   get(id: number): Promise<ApiVehicle> {
     return request<ApiVehicle>(`/vehicles/${id}`);
   },
@@ -446,17 +490,30 @@ export const vehicleApi = {
         : {}),
     };
     return request<ApiVehicle>(`/vehicles/${id}`, {
-      method: "PUT",
+      method: "PATCH",
       body: payload,
     });
   },
 
-  delete(id: number): Promise<{ message: string; deleted_id?: number }> {
-    return request<{ message: string; deleted_id?: number }>(`/vehicles/${id}`, {
+  setPrimary(id: number): Promise<ApiVehicle> {
+    return request<ApiVehicle>(`/vehicles/${id}/set-primary`, {
+      method: "PATCH",
+    });
+  },
+
+  delete(id: number): Promise<void> {
+    return request<void>(`/vehicles/${id}`, {
       method: "DELETE",
     });
   },
 };
+
+export const getVehicles = () => vehicleApi.list();
+export const getPrimaryVehicle = () => vehicleApi.getPrimary();
+export const createVehicle = (data: VehicleCreateInput) => vehicleApi.create(data);
+export const updateVehicle = (id: number, data: VehicleUpdateInput) => vehicleApi.update(id, data);
+export const setPrimaryVehicle = (id: number) => vehicleApi.setPrimary(id);
+export const deleteVehicle = (id: number) => vehicleApi.delete(id);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Bookings API (Module 4)

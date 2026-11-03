@@ -6,7 +6,14 @@ import secrets
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserSignup, UserLogin, GoogleLogin, UserResponse, TokenResponse
+from app.schemas.user import (
+    UserSignup,
+    UserLogin,
+    GoogleLogin,
+    UserResponse,
+    TokenResponse,
+    UserProfileUpdate,
+)
 from app.core.google_auth import verify_google_credential
 from app.core.security import hash_password, verify_password, create_access_token
 from app.core.dependencies import get_current_user
@@ -140,3 +147,57 @@ def get_me(current_user: User = Depends(get_current_user)):
     Requires: Authorization: Bearer <token>
     """
     return current_user
+
+# ==========================================
+# 4. UPDATE CURRENT USER PROFILE
+# ==========================================
+
+@router.patch("/profile", response_model=UserResponse)
+def update_profile(
+    profile_data: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Updates profile information of currently authenticated user.
+    Requires: Authorization: Bearer <token>
+    """
+    update_dict = profile_data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(current_user, field, value)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me", response_model=UserResponse, include_in_schema=False)
+def update_me(
+    profile_data: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Alias for PATCH /auth/profile."""
+    return update_profile(profile_data=profile_data, db=db, current_user=current_user)
+
+
+# ==========================================
+# 5. /users ROUTER ALIASES
+# ==========================================
+
+users_router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@users_router.get("/me", response_model=UserResponse)
+def get_user_me(current_user: User = Depends(get_current_user)):
+    """Return current user profile via /users/me."""
+    return current_user
+
+
+@users_router.patch("/me", response_model=UserResponse)
+def update_user_me(
+    profile_data: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update current user profile via /users/me."""
+    return update_profile(profile_data=profile_data, db=db, current_user=current_user)
