@@ -69,6 +69,12 @@ def health_check():
     }
 
 
+@app.get("/v1/models", tags=["Core"], include_in_schema=False)
+def v1_models():
+    """Stub endpoint for local AI extensions and tools probing OpenAI-compatible endpoints on port 8000."""
+    return {"object": "list", "data": []}
+
+
 # =============================================================================
 # 4. Wrap with Outer CORS Middleware
 # Wrapping the FastAPI stack ensures CORS headers are attached to all responses,

@@ -1,50 +1,38 @@
 /**
  * Centralized API client for VoltRelay.
- * Base URL is read from NEXT_PUBLIC_API_URL environment variable.
- * Automatically attaches Authorization: Bearer <token> for protected requests.
+ * Uses native Supabase authentication sessions & cookies.
+ * Automatically attaches Authorization: Bearer <token> for protected requests if available.
  */
 
+import { createClient } from "./supabase/client";
+
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_URL !== undefined
+    ? process.env.NEXT_PUBLIC_API_URL
+    : "";
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Token & User Storage
+// Token & User Storage Compatibility Stubs (Deprecated: Supabase manages cookies)
 // ──────────────────────────────────────────────────────────────────────────────
-
-const TOKEN_KEY = "ev_grid_access_token";
-const USER_KEY = "ev_grid_user";
 
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return null;
 }
 
-export function setToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
+export function setToken(_token: string): void {
+  // Handled automatically by Supabase session cookies
 }
 
 export function clearToken(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  // Handled automatically by Supabase signOut
 }
 
 export function getStoredUser(): ApiUser | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(USER_KEY);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as ApiUser;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
-export function setStoredUser(user: ApiUser): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+export function setStoredUser(_user: ApiUser): void {
+  // Handled automatically by Supabase session
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -52,7 +40,7 @@ export function setStoredUser(user: ApiUser): void {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export interface ApiUser {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   phone?: string | null;
@@ -115,7 +103,7 @@ export interface CompatibleStationsResponse {
 
 export interface ApiVehicle {
   id: number;
-  user_id: number;
+  user_id: number | string;
   make: string;
   model: string;
   year: number;
@@ -211,7 +199,7 @@ export interface ApiChargingSession {
   id: number;
   connector_id: number;
   booking_id?: number | null;
-  user_id?: number | null;
+  user_id?: number | string | null;
   status: "ACTIVE" | "COMPLETED" | "FAULTED";
   started_at: string;
   ended_at?: string | null;
@@ -297,19 +285,31 @@ async function request<T>(
     Accept: "application/json",
   };
 
-  if (!isPublic) {
-    const token = getToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+  if (!isPublic && typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+    } catch {
+      // Session lookup failed, continue with standard cookies
     }
   }
 
   let response: Response;
+  const url =
+    path.startsWith("http://") || path.startsWith("https://")
+      ? path
+      : `${BASE_URL}${path}`;
 
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(url, {
       method,
       headers,
+      credentials: "include",
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -343,6 +343,8 @@ async function request<T>(
 
     if (typeof errorObj?.detail === "string") {
       message = errorObj.detail;
+    } else if (typeof errorObj?.error === "string") {
+      message = errorObj.error;
     } else if (
       Array.isArray(errorObj?.detail) &&
       errorObj.detail.length > 0
@@ -363,8 +365,6 @@ async function request<T>(
       }
     } else if (typeof errorObj?.message === "string") {
       message = errorObj.message;
-    } else if (typeof errorObj?.error === "string") {
-      message = errorObj.error;
     }
 
     throw new ApiError(response.status, message);
@@ -378,39 +378,81 @@ async function request<T>(
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  signup(name: string, email: string, password: string): Promise<AuthResponse> {
-    return request<AuthResponse>("/auth/signup", {
-      method: "POST",
-      body: { name, email, password },
-      public: true,
-    });
+  signup(_name: string, _email: string, _password: string): Promise<AuthResponse> {
+    throw new Error("Use useAuth().signup() for native Supabase authentication");
   },
 
-  login(email: string, password: string): Promise<AuthResponse> {
-    return request<AuthResponse>("/auth/login", {
-      method: "POST",
-      body: { email, password },
-      public: true,
-    });
+  login(_email: string, _password: string): Promise<AuthResponse> {
+    throw new Error("Use useAuth().login() for native Supabase authentication");
   },
 
-  me(): Promise<ApiUser> {
+  async me(): Promise<ApiUser> {
+    if (typeof window !== "undefined") {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new ApiError(401, "Not authenticated");
+      }
+
+      const metadata = user.user_metadata || {};
+      return {
+        id: user.id,
+        name: metadata.full_name || metadata.name || user.email?.split("@")[0] || "EV Driver",
+        email: user.email || "",
+        phone: user.phone || metadata.phone || null,
+        city: metadata.city || null,
+        profile_image_url: metadata.avatar_url || metadata.picture || null,
+        role: metadata.role || "driver",
+        created_at: user.created_at,
+        updated_at: user.updated_at || null,
+      };
+    }
+
     return request<ApiUser>("/auth/me");
   },
 
-  updateProfile(data: UserProfileUpdateInput): Promise<ApiUser> {
+  async updateProfile(data: UserProfileUpdateInput): Promise<ApiUser> {
+    if (typeof window !== "undefined") {
+      const supabase = createClient();
+      const updates: Record<string, unknown> = {};
+      if (data.name !== undefined) updates.full_name = data.name;
+      if (data.phone !== undefined) updates.phone = data.phone;
+      if (data.city !== undefined) updates.city = data.city;
+      if (data.profile_image_url !== undefined) updates.avatar_url = data.profile_image_url;
+
+      const { data: updated, error } = await supabase.auth.updateUser({
+        data: updates,
+      });
+
+      if (error) {
+        throw new ApiError(400, error.message);
+      }
+
+      const metadata = updated.user.user_metadata || {};
+      return {
+        id: updated.user.id,
+        name: metadata.full_name || metadata.name || updated.user.email?.split("@")[0] || "EV Driver",
+        email: updated.user.email || "",
+        phone: updated.user.phone || metadata.phone || null,
+        city: metadata.city || null,
+        profile_image_url: metadata.avatar_url || metadata.picture || null,
+        role: metadata.role || "driver",
+        created_at: updated.user.created_at,
+        updated_at: updated.user.updated_at || null,
+      };
+    }
+
     return request<ApiUser>("/auth/profile", {
       method: "PATCH",
       body: data,
     });
   },
 
-  google(credential: string): Promise<AuthResponse> {
-    return request<AuthResponse>("/auth/google", {
-      method: "POST",
-      body: { credential },
-      public: true,
-    });
+  google(_credential: string): Promise<AuthResponse> {
+    throw new Error("Use useAuth().googleLogin() for native Supabase Google OAuth");
   },
 };
 

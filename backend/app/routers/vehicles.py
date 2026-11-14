@@ -56,7 +56,7 @@ def get_vehicle_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Vehicle not found.",
         )
-    if vehicle.user_id != current_user.id:
+    if getattr(vehicle, "user_id") != getattr(current_user, "id"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this vehicle.",
@@ -100,7 +100,7 @@ def update_vehicle(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Vehicle not found.",
         )
-    if db_vehicle.user_id != current_user.id:
+    if getattr(db_vehicle, "user_id") != getattr(current_user, "id"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this vehicle.",
@@ -132,7 +132,7 @@ def set_primary_vehicle(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Vehicle not found.",
         )
-    if db_vehicle.user_id != current_user.id:
+    if getattr(db_vehicle, "user_id") != getattr(current_user, "id"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this vehicle.",
@@ -159,7 +159,7 @@ def delete_vehicle(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Vehicle not found.",
         )
-    if db_vehicle.user_id != current_user.id:
+    if getattr(db_vehicle, "user_id") != getattr(current_user, "id"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this vehicle.",

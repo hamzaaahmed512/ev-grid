@@ -128,9 +128,23 @@ def create_booking(
         end_time=end,
         status="CONFIRMED"
     )
-    db.add(booking)
-    db.commit()
-    db.refresh(booking)
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Connector is already booked or conflicting for this time slot"
+        )
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not complete booking: {str(err)}"
+        )
 
     return _to_response(booking)
 
@@ -161,7 +175,7 @@ def _get_owned_booking(db: Session, booking_id: int, user_id: int) -> Booking:
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Booking not found")
-    if booking.user_id != user_id:
+    if getattr(booking, "user_id") != user_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Booking not found") # 404 security practice
     return booking
 

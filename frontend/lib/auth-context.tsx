@@ -1,9 +1,11 @@
 'use client';
+
 /**
- * AuthContext — provides authentication state and actions to the whole app.
- * Uses the real FastAPI backend via lib/api.ts.
- * Token is persisted in localStorage; user profile is re-validated on mount.
+ * AuthContext — standardized on native Supabase Auth sessions.
+ * Manages HTTP-only cookie-based sessions, auto-token refresh,
+ * onAuthStateChange listeners, and eliminates manual localStorage JWT conflicts.
  */
+
 import {
   createContext,
   useContext,
@@ -12,36 +14,55 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import {
-  authApi,
-  getToken,
-  setToken,
-  clearToken,
-  getStoredUser,
-  setStoredUser,
-  ApiError,
-  type ApiUser,
-  type UserProfileUpdateInput,
-} from './api';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { createClient } from './supabase/client';
+import type { ApiUser, UserProfileUpdateInput } from './api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AuthState {
-  /** null = not loaded yet, undefined = not authenticated */
+  /** null = loading, undefined = not logged in, ApiUser = logged in */
   user: ApiUser | null | undefined;
-  /** True while the initial token verification is in flight */
+  session: Session | null;
+  /** True until initial session hydration from Supabase completes */
   loading: boolean;
-  /** Sign up a new user — returns error string on failure */
+  /** Sign up with email & password */
   signup(name: string, email: string, password: string): Promise<string | null>;
-  /** Log in an existing user — returns error string on failure */
+  /** Log in with email & password */
   login(email: string, password: string): Promise<string | null>;
-  googleLogin(credential: string): Promise<string | null>;
-  /** Update user profile */
+  /** Trigger Supabase Google OAuth redirect */
+  googleLogin(): Promise<string | null>;
+  /** Update user profile attributes in Supabase user metadata */
   updateProfile(data: UserProfileUpdateInput): Promise<string | null>;
-  /** Force refresh current user from backend */
+  /** Refresh current user profile */
   refreshUser(): Promise<ApiUser | null>;
-  /** Clear token & user state */
-  logout(): void;
+  /** Log out and clear Supabase session */
+  logout(): Promise<void>;
+}
+
+// ── User Mapping Helper ───────────────────────────────────────────────────────
+
+export function mapSupabaseUser(user: SupabaseUser | null | undefined): ApiUser | null {
+  if (!user) return null;
+
+  const metadata = user.user_metadata || {};
+  const name =
+    metadata.full_name ||
+    metadata.name ||
+    user.email?.split('@')[0] ||
+    'EV Driver';
+
+  return {
+    id: user.id,
+    name,
+    email: user.email || '',
+    phone: user.phone || metadata.phone || null,
+    city: metadata.city || null,
+    profile_image_url: metadata.avatar_url || metadata.picture || metadata.profile_image_url || null,
+    role: metadata.role || 'driver',
+    created_at: user.created_at,
+    updated_at: user.updated_at || null,
+  };
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -49,122 +70,173 @@ export interface AuthState {
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // null = loading, undefined = logged-out, ApiUser = logged-in
+  const [supabase] = useState(() => createClient());
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<ApiUser | null | undefined>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initial session hydration and onAuthStateChange listener
+  useEffect(() => {
+    let mounted = true;
+
+    async function hydrateSession() {
+      try {
+        const {
+          data: { session: initialSession },
+        } = await supabase.auth.getSession();
+
+        if (mounted) {
+          setSession(initialSession);
+          setUser(initialSession ? mapSupabaseUser(initialSession.user) : undefined);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to hydrate Supabase auth session:', err);
+        if (mounted) {
+          setUser(undefined);
+          setLoading(false);
+        }
+      }
+    }
+
+    hydrateSession();
+
+    // Listen to native Supabase session events
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      if (!mounted) return;
+      setSession(currentSession);
+      setUser(currentSession ? mapSupabaseUser(currentSession.user) : undefined);
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
   const refreshUser = useCallback(async (): Promise<ApiUser | null> => {
     try {
-      const me = await authApi.me();
-      setUser(me);
-      setStoredUser(me);
-      return me;
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+
+      const mapped = mapSupabaseUser(currentUser);
+      setUser(mapped || undefined);
+      return mapped;
     } catch {
       return null;
     }
-  }, []);
-
-  // On mount: if a token exists in localStorage, verify it with /auth/me
-  useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      // No token — try to restore from cached user data, then mark as logged out
-      setUser(undefined);
-      setLoading(false);
-      return;
-    }
-
-    // Optimistically restore from localStorage first (avoids flash)
-    const cached = getStoredUser();
-    if (cached) setUser(cached);
-
-    authApi
-      .me()
-      .then((me) => {
-        setUser(me);
-        setStoredUser(me);
-      })
-      .catch(() => {
-        // Token is expired or invalid — clear everything
-        clearToken();
-        setUser(undefined);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  }, [supabase]);
 
   const signup = useCallback(
     async (name: string, email: string, password: string): Promise<string | null> => {
       try {
-        const res = await authApi.signup(name, email, password);
-        setToken(res.access_token);
-        setStoredUser(res.user);
-        setUser(res.user);
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name,
+              name,
+              role: 'driver',
+            },
+            emailRedirectTo: `${origin}/api/auth/callback`,
+          },
+        });
+
+        if (error) return error.message;
         return null;
       } catch (err: unknown) {
-        if (err instanceof ApiError) {
-          return err.detail || err.message;
-        }
-        return (err as { detail?: string; message?: string })?.detail ?? (err as { message?: string })?.message ?? 'Signup failed. Please try again.';
+        return (err as Error)?.message ?? 'Signup failed. Please try again.';
       }
     },
-    [],
+    [supabase],
   );
 
   const login = useCallback(
     async (email: string, password: string): Promise<string | null> => {
       try {
-        const res = await authApi.login(email, password);
-        setToken(res.access_token);
-        setStoredUser(res.user);
-        setUser(res.user);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) return error.message;
         return null;
       } catch (err: unknown) {
-        if (err instanceof ApiError) {
-          return err.detail || err.message;
-        }
-        return (err as { detail?: string; message?: string })?.detail ?? (err as { message?: string })?.message ?? 'Login failed. Please try again.';
+        return (err as Error)?.message ?? 'Login failed. Please try again.';
       }
     },
-    [],
+    [supabase],
   );
 
-  const googleLogin = useCallback(async (credential: string): Promise<string | null> => {
+  const googleLogin = useCallback(async (): Promise<string | null> => {
     try {
-      const res = await authApi.google(credential);
-      setToken(res.access_token);
-      setStoredUser(res.user);
-      setUser(res.user);
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${origin}/api/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) return error.message;
       return null;
     } catch (err: unknown) {
-      return err instanceof ApiError ? err.detail : 'Google sign-in failed. Please try again.';
+      return (err as Error)?.message ?? 'Google sign-in failed. Please try again.';
     }
-  }, []);
+  }, [supabase]);
 
   const updateProfile = useCallback(
     async (data: UserProfileUpdateInput): Promise<string | null> => {
       try {
-        const updated = await authApi.updateProfile(data);
-        setUser(updated);
-        setStoredUser(updated);
+        const updates: Record<string, unknown> = {};
+        if (data.name !== undefined) updates.full_name = data.name;
+        if (data.phone !== undefined) updates.phone = data.phone;
+        if (data.city !== undefined) updates.city = data.city;
+        if (data.profile_image_url !== undefined) updates.avatar_url = data.profile_image_url;
+
+        const { data: updated, error } = await supabase.auth.updateUser({
+          data: updates,
+        });
+
+        if (error) return error.message;
+        setUser(mapSupabaseUser(updated.user));
         return null;
       } catch (err: unknown) {
-        if (err instanceof ApiError) {
-          return err.detail || err.message;
-        }
-        return (err as { detail?: string; message?: string })?.detail ?? (err as { message?: string })?.message ?? 'Failed to update profile.';
+        return (err as Error)?.message ?? 'Failed to update profile.';
       }
     },
-    [],
+    [supabase],
   );
 
-  const logout = useCallback(() => {
-    clearToken();
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setSession(null);
     setUser(undefined);
-  }, []);
+  }, [supabase]);
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signup, login, googleLogin, updateProfile, refreshUser, logout }}
+      value={{
+        user,
+        session,
+        loading,
+        signup,
+        login,
+        googleLogin,
+        updateProfile,
+        refreshUser,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

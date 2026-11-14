@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { sessionApi, ApiChargingSession, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SessionsHistoryPage() {
+  const { user, loading: authLoading } = useAuth();
   const [sessions, setSessions] = useState<ApiChargingSession[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +28,15 @@ export default function SessionsHistoryPage() {
   }
 
   useEffect(() => {
-    loadSessions();
-  }, []);
+    if (!authLoading) {
+      if (user) {
+        loadSessions();
+      } else {
+        setSessions([]);
+        setLoading(false);
+      }
+    }
+  }, [authLoading, user]);
 
   return (
     <div className="mx-auto max-w-5xl p-6">

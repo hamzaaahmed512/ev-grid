@@ -45,3 +45,10 @@ class Vehicle(Base):
 
     # Relationships
     user = relationship("User", back_populates="vehicles")
+
+    @property
+    def name(self) -> str:
+        """Helper to return display name (e.g. for bookings)."""
+        if self.nickname:
+            return self.nickname
+        return f"{self.make} {self.model}".strip()

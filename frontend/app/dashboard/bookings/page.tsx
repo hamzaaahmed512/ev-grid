@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { bookingApi, ApiBooking, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import LiveSessionCard from "@/components/LiveSessionCard";
 import { useLiveStations } from "@/lib/useLiveStations";
 
 export default function BookingsPage() {
+  const { user, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<ApiBooking[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +33,15 @@ export default function BookingsPage() {
   }
 
   useEffect(() => {
-    loadBookings();
-  }, []);
+    if (!authLoading) {
+      if (user) {
+        loadBookings();
+      } else {
+        setBookings([]);
+        setLoading(false);
+      }
+    }
+  }, [authLoading, user]);
 
   async function handleCancel(id: number) {
     if (!confirm("Are you sure you want to cancel this booking?")) return;

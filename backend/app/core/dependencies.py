@@ -33,13 +33,22 @@ def get_current_user(
     if user_id_str is None:
         raise credentials_exception
     
+    user = None
     try:
         user_id = int(user_id_str)
+        user = db.query(User).filter(User.id == user_id).first()
     except ValueError:
-        raise credentials_exception
+        # Supabase auth uses UUID strings for 'sub'
+        email = payload.get("email")
+        if email:
+            normalized_email = email.strip().lower()
+            user = db.query(User).filter(
+                (User.google_sub == user_id_str) | (User.email == normalized_email)
+            ).first()
+        else:
+            user = db.query(User).filter(User.google_sub == user_id_str).first()
 
-    # 3. Query user from database
-    user = db.query(User).filter(User.id == user_id).first()
+    # 3. Guard against missing user
     if user is None:
         raise credentials_exception
     

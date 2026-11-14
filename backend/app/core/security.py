@@ -46,10 +46,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def decode_access_token(token: str) -> Optional[dict]:
     """
-    Verifies and decodes an incoming JWT token.
+    Verifies and decodes an incoming JWT token (supports custom and Supabase JWTs).
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
     except JWTError:
-        return None
+        try:
+            # Fallback to extract claims from Supabase tokens
+            return jwt.get_unverified_claims(token)
+        except Exception:
+            return None

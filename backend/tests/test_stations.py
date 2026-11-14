@@ -79,6 +79,18 @@ class StationsApiTests(unittest.TestCase):
         self.assertEqual(data[0]["connectors"][0]["price_per_kwh"], 80.0)
         self.assertEqual(data[0]["connectors"][0]["charging_type"], "DC")
 
+    def test_v1_models_endpoint(self):
+        response = perform_request(
+            app,
+            "GET",
+            "/v1/models",
+            {"Origin": FRONTEND_ORIGIN},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        self.assertEqual(data.get("object"), "list")
+        self.assertEqual(data.get("data"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
