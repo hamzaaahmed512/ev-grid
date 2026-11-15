@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getLegacyUserId } from '@/lib/supabase/identity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,13 +15,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const legacyUserId = await getLegacyUserId(supabase, user);
+    if (!legacyUserId) {
+      return NextResponse.json({ error: 'User profile not provisioned' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status');
 
     let query = supabase
       .from('bookings')
       .select('*, vehicle:vehicles(*), station:stations(*), connector:connectors(*)')
-      .eq('user_id', user.id)
+      .eq('user_id', legacyUserId)
       .order('start_time', { ascending: false });
 
     if (statusFilter) {
@@ -63,6 +69,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const legacyUserId = await getLegacyUserId(supabase, user);
+    if (!legacyUserId) {
+      return NextResponse.json({ error: 'User profile not provisioned' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { vehicle_id, connector_id, start_time, duration_minutes } = body;
 
@@ -101,7 +112,7 @@ export async function POST(request: NextRequest) {
       .from('vehicles')
       .select('*')
       .eq('id', vehicle_id)
-      .eq('user_id', user.id)
+      .eq('user_id', legacyUserId)
       .single();
 
     if (vehError || !vehicle) {
@@ -153,7 +164,7 @@ export async function POST(request: NextRequest) {
     const { data: newBooking, error: insertError } = await supabase
       .from('bookings')
       .insert({
-        user_id: user.id,
+        user_id: legacyUserId,
         vehicle_id: vehicle.id,
         station_id: connector.station_id,
         connector_id: connector.id,

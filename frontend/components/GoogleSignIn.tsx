@@ -5,10 +5,8 @@ import { useAuth } from '../lib/auth-context';
 
 export default function GoogleSignIn({
   disabled = false,
-  onCredential,
 }: {
   disabled?: boolean;
-  onCredential?: (credential: string) => Promise<void>;
 }) {
   const { googleLogin } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -20,12 +18,8 @@ export default function GoogleSignIn({
     setLoading(true);
 
     try {
-      if (onCredential) {
-        // If caller passed a custom handler, call it
-        await googleLogin();
-      } else {
-        await googleLogin();
-      }
+      const err = await googleLogin();
+      if (err) setError(err);
     } catch (err: unknown) {
       setError((err as Error)?.message || 'Failed to initiate Google sign-in.');
     } finally {

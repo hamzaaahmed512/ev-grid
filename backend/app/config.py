@@ -67,11 +67,9 @@ class Settings:
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "").strip()
-    
-    # Security / JWT Settings
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "fallback-secret-key-change-this-2025")
-    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+
+    # Supabase Auth (only verification — all sessions are issued by Supabase)
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "").strip()
     
     # CORS (Frontend permissions)
     _configured_origins: str | None = (

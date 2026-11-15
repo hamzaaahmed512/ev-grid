@@ -1,39 +1,12 @@
 /**
- * Centralized API client for VoltRelay.
- * Uses native Supabase authentication sessions & cookies.
- * Automatically attaches Authorization: Bearer <token> for protected requests if available.
+ * Centralized API client for EV Grid.
+ * All requests hit the app's own Next.js API routes (/api/*), which
+ * authenticate with native Supabase session cookies (managed by
+ * @supabase/ssr + middleware.ts). No custom Authorization headers,
+ * no external API base URL.
  */
 
 import { createClient } from "./supabase/client";
-
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL !== undefined
-    ? process.env.NEXT_PUBLIC_API_URL
-    : "";
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Token & User Storage Compatibility Stubs (Deprecated: Supabase manages cookies)
-// ──────────────────────────────────────────────────────────────────────────────
-
-export function getToken(): string | null {
-  return null;
-}
-
-export function setToken(_token: string): void {
-  // Handled automatically by Supabase session cookies
-}
-
-export function clearToken(): void {
-  // Handled automatically by Supabase signOut
-}
-
-export function getStoredUser(): ApiUser | null {
-  return null;
-}
-
-export function setStoredUser(_user: ApiUser): void {
-  // Handled automatically by Supabase session
-}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Type Definitions
@@ -271,6 +244,7 @@ export class ApiError extends Error {
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  /** Kept for call-site compatibility; auth is always supplied by session cookies. */
   public?: boolean;
 }
 
@@ -278,32 +252,15 @@ async function request<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { method = "GET", body, public: isPublic = false } = options;
+  const { method = "GET", body } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
 
-  if (!isPublic && typeof window !== "undefined") {
-    try {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
-      }
-    } catch {
-      // Session lookup failed, continue with standard cookies
-    }
-  }
-
   let response: Response;
-  const url =
-    path.startsWith("http://") || path.startsWith("https://")
-      ? path
-      : `${BASE_URL}${path}`;
+  const url = path;
 
   try {
     response = await fetch(url, {
@@ -411,7 +368,7 @@ export const authApi = {
       };
     }
 
-    return request<ApiUser>("/auth/me");
+    return request<ApiUser>("/api/auth/me");
   },
 
   async updateProfile(data: UserProfileUpdateInput): Promise<ApiUser> {
@@ -445,7 +402,7 @@ export const authApi = {
       };
     }
 
-    return request<ApiUser>("/auth/profile", {
+    return request<ApiUser>("/api/profile", {
       method: "PATCH",
       body: data,
     });
@@ -476,7 +433,7 @@ export const stationApi = {
     }
 
     const queryString = queryParams.toString();
-    const url = queryString ? `/stations/?${queryString}` : "/stations/";
+    const url = queryString ? `/api/stations?${queryString}` : "/api/stations";
 
     return request<ApiStation[]>(url, {
       public: true,
@@ -484,14 +441,14 @@ export const stationApi = {
   },
 
   get(id: number): Promise<ApiStation> {
-    return request<ApiStation>(`/stations/${id}`, {
+    return request<ApiStation>(`/api/stations/${id}`, {
       public: true,
     });
   },
 
   compatible(vehicleId: number): Promise<CompatibleStationsResponse> {
     return request<CompatibleStationsResponse>(
-      `/stations/compatible?vehicle_id=${vehicleId}`
+      `/api/stations/compatible?vehicle_id=${vehicleId}`
     );
   },
 };
@@ -502,15 +459,15 @@ export const stationApi = {
 
 export const vehicleApi = {
   list(): Promise<ApiVehicle[]> {
-    return request<ApiVehicle[]>("/vehicles/");
+    return request<ApiVehicle[]>("/api/vehicles");
   },
 
   getPrimary(): Promise<ApiVehicle> {
-    return request<ApiVehicle>("/vehicles/primary");
+    return request<ApiVehicle>("/api/vehicles/primary");
   },
 
   get(id: number): Promise<ApiVehicle> {
-    return request<ApiVehicle>(`/vehicles/${id}`);
+    return request<ApiVehicle>(`/api/vehicles/${id}`);
   },
 
   create(data: VehicleCreateInput): Promise<ApiVehicle> {
@@ -518,7 +475,7 @@ export const vehicleApi = {
       ...data,
       battery_capacity_kwh: data.battery_capacity_kwh ?? data.battery_kwh,
     };
-    return request<ApiVehicle>("/vehicles/", {
+    return request<ApiVehicle>("/api/vehicles", {
       method: "POST",
       body: payload,
     });
@@ -531,20 +488,20 @@ export const vehicleApi = {
         ? { battery_capacity_kwh: data.battery_capacity_kwh ?? data.battery_kwh }
         : {}),
     };
-    return request<ApiVehicle>(`/vehicles/${id}`, {
+    return request<ApiVehicle>(`/api/vehicles/${id}`, {
       method: "PATCH",
       body: payload,
     });
   },
 
   setPrimary(id: number): Promise<ApiVehicle> {
-    return request<ApiVehicle>(`/vehicles/${id}/set-primary`, {
+    return request<ApiVehicle>(`/api/vehicles/${id}/set-primary`, {
       method: "PATCH",
     });
   },
 
   delete(id: number): Promise<void> {
-    return request<void>(`/vehicles/${id}`, {
+    return request<void>(`/api/vehicles/${id}`, {
       method: "DELETE",
     });
   },
@@ -564,14 +521,14 @@ export const deleteVehicle = (id: number) => vehicleApi.delete(id);
 export const bookingApi = {
   async list(status?: BookingStatus): Promise<ApiBooking[]> {
     const q = status ? `?status=${status}` : "";
-    const data = await request<{ count: number; bookings: ApiBooking[] }>(`/bookings/${q}`);
+    const data = await request<{ count: number; bookings: ApiBooking[] }>(`/api/bookings${q}`);
     return data?.bookings ?? [];
   },
   create(data: BookingCreateInput): Promise<ApiBooking> {
-    return request<ApiBooking>("/bookings/", { method: "POST", body: data });
+    return request<ApiBooking>("/api/bookings", { method: "POST", body: data });
   },
   cancel(id: number): Promise<ApiBooking> {
-    return request<ApiBooking>(`/bookings/${id}/cancel`, { method: "PUT" });
+    return request<ApiBooking>(`/api/bookings/${id}/cancel`, { method: "PUT" });
   },
 };
 
@@ -582,18 +539,18 @@ export const bookingApi = {
 export const sessionApi = {
   async me(skip = 0, limit = 50): Promise<ApiChargingSession[]> {
     const data = await request<{ count: number; sessions: ApiChargingSession[] }>(
-      `/sessions/me?skip=${skip}&limit=${limit}`
+      `/api/sessions/me?skip=${skip}&limit=${limit}`
     );
     return data?.sessions ?? [];
   },
 
   get(id: number): Promise<ApiChargingSession> {
-    return request<ApiChargingSession>(`/sessions/${id}`);
+    return request<ApiChargingSession>(`/api/sessions/${id}`);
   },
 
   stop(id: number): Promise<{ ok: boolean; session_id: number; message: string }> {
     return request<{ ok: boolean; session_id: number; message: string }>(
-      `/sessions/${id}/stop`,
+      `/api/sessions/${id}/stop`,
       { method: "POST" }
     );
   },
@@ -601,7 +558,7 @@ export const sessionApi = {
 
 export const connectorApi = {
   live(id: number): Promise<ApiConnectorLive> {
-    return request<ApiConnectorLive>(`/connectors/${id}/live`, {
+    return request<ApiConnectorLive>(`/api/connectors/${id}/live`, {
       public: true,
     });
   },
@@ -613,7 +570,7 @@ export const connectorApi = {
 
 export const healthApi = {
   check(): Promise<{ status: string; project: string }> {
-    return request<{ status: string; project: string }>("/health", {
+    return request<{ status: string; project: string }>("/api/health", {
       public: true,
     });
   },

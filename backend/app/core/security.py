@@ -1,7 +1,8 @@
 import bcrypt
-from datetime import datetime, timedelta
 from typing import Optional
+
 from jose import JWTError, jwt
+
 from app.config import settings
 
 # ==========================================
@@ -26,34 +27,27 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 # ==========================================
-# 2. JWT TOKEN FUNCTIONS
+# 2. SUPABASE TOKEN VERIFICATION
 # ==========================================
+# Custom JWT signing/verification was removed. Supabase Auth issues and
+# refreshes all sessions; this service only *verifies* Supabase access
+# tokens using the project's JWT secret (HS256, aud = "authenticated").
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def decode_supabase_token(token: str) -> Optional[dict]:
     """
-    Generates a signed JWT Access Token containing user payload.
+    Verifies a Supabase Auth access token and returns its claims.
+    Returns None when the token is missing configuration, malformed,
+    expired, or fails signature/audience validation.
     """
-    to_encode = data.copy()
-    
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt
-
-def decode_access_token(token: str) -> Optional[dict]:
-    """
-    Verifies and decodes an incoming JWT token (supports custom and Supabase JWTs).
-    """
+    if not settings.SUPABASE_JWT_SECRET:
+        # SUPABASE_JWT_SECRET is required to accept Supabase tokens.
+        return None
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
+        return jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
     except JWTError:
-        try:
-            # Fallback to extract claims from Supabase tokens
-            return jwt.get_unverified_claims(token)
-        except Exception:
-            return None
+        return None

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getLegacyUserId } from '@/lib/supabase/identity';
 
 export async function PATCH(
   _request: Request,
@@ -22,18 +23,23 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const legacyUserId = await getLegacyUserId(supabase, user);
+    if (!legacyUserId) {
+      return NextResponse.json({ error: 'User profile not provisioned' }, { status: 401 });
+    }
+
     // Reset others
     await supabase
       .from('vehicles')
       .update({ is_primary: false })
-      .eq('user_id', user.id);
+      .eq('user_id', legacyUserId);
 
     // Set this one as primary
     const { data: updated, error: updateError } = await supabase
       .from('vehicles')
       .update({ is_primary: true })
       .eq('id', vehicleId)
-      .eq('user_id', user.id)
+      .eq('user_id', legacyUserId)
       .select('*')
       .single();
 

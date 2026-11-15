@@ -5,6 +5,17 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/';
+  const oauthError = searchParams.get('error');
+  const oauthErrorDescription = searchParams.get('error_description');
+
+  // Supabase redirects here with ?error=… when the OAuth provider or the
+  // redirect configuration rejects the flow. Surface a readable reason.
+  if (oauthError) {
+    const message = encodeURIComponent(
+      oauthErrorDescription || `Google sign-in failed: ${oauthError}`
+    );
+    return NextResponse.redirect(`${origin}/?auth_error=${message}`);
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -20,6 +31,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}${next}`);
       }
     }
+    console.error('Supabase code exchange failed:', error.message);
   }
 
   // Return the user to home with an error parameter if exchange fails

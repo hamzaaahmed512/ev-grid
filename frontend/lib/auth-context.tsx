@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (name: string, email: string, password: string): Promise<string | null> => {
       try {
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -149,6 +149,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (error) return error.message;
+
+        // When "Confirm email" is enabled on the Supabase project, signUp()
+        // succeeds but returns no session. Do NOT treat that as a login:
+        // tell the user to confirm their address first (sentinel consumed
+        // by the auth UI, which shows a friendly notice instead of a red error).
+        if (!data.session) {
+          return 'EMAIL_CONFIRMATION_REQUIRED';
+        }
+
         return null;
       } catch (err: unknown) {
         return (err as Error)?.message ?? 'Signup failed. Please try again.';
@@ -177,14 +186,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const googleLogin = useCallback(async (): Promise<string | null> => {
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      // NOTE: do NOT pass access_type:'offline' / prompt:'consent'.
+      // prompt:'consent' forces Google to re-issue consent every time and is a
+      // known contributor to Supabase's "Unable to exchange external code"
+      // failure with PKCE flows (the single-use authorization code gets
+      // replayed/voided). Supabase manages refresh tokens itself.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${origin}/api/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
         },
       });
 

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getLegacyUserId } from '@/lib/supabase/identity';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -14,10 +15,15 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const legacyUserId = await getLegacyUserId(supabase, user);
+    if (!legacyUserId) {
+      return NextResponse.json({ error: 'User profile not provisioned' }, { status: 401 });
+    }
+
     const { data: vehicles, error: dbError } = await supabase
       .from('vehicles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', legacyUserId)
       .order('created_at', { ascending: false });
 
     if (dbError) {
@@ -51,6 +57,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const legacyUserId = await getLegacyUserId(supabase, user);
+    if (!legacyUserId) {
+      return NextResponse.json({ error: 'User profile not provisioned' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       make,
@@ -77,7 +88,7 @@ export async function POST(request: NextRequest) {
     const { count, error: countError } = await supabase
       .from('vehicles')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
+      .eq('user_id', legacyUserId);
 
     if (countError) {
       console.error('Error checking vehicle count:', countError);
@@ -89,13 +100,13 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('vehicles')
         .update({ is_primary: false })
-        .eq('user_id', user.id);
+        .eq('user_id', legacyUserId);
     }
 
     const { data: created, error: insertError } = await supabase
       .from('vehicles')
       .insert({
-        user_id: user.id,
+        user_id: legacyUserId,
         make: make.trim(),
         model: model.trim(),
         year: parseInt(year, 10),
