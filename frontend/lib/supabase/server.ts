@@ -3,8 +3,18 @@ import { cookies } from 'next/headers';
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Fallback placeholder so static prerendering doesn't crash.
+    return createServerClient('https://placeholder.supabase.co', 'placeholder-key', {
+      cookies: {
+        getAll() { return []; },
+        setAll() {},
+      },
+    });
+  }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
