@@ -32,8 +32,15 @@ export async function GET(request: Request) {
       }
     }
     console.error('Supabase code exchange failed:', error.message);
+    // Surface the exchange failure reason to the UI (shown on the login
+    // screen) instead of leaving only a server-side log.
+    return NextResponse.redirect(
+      `${origin}/?auth_error=${encodeURIComponent(`could_not_authenticate: ${error.message}`)}`
+    );
   }
 
-  // Return the user to home with an error parameter if exchange fails
-  return NextResponse.redirect(`${origin}/?auth_error=could_not_authenticate`);
+  // No code at all — Supabase never reached us with an authorization code.
+  return NextResponse.redirect(
+    `${origin}/?auth_error=${encodeURIComponent('could_not_authenticate: no authorization code was returned by the provider')}`
+  );
 }

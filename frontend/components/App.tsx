@@ -97,9 +97,20 @@ export default function App(){
  useEffect(()=>{
   if(typeof window==='undefined')return;
   const params=new URLSearchParams(window.location.search);
-  if(params.get('auth_error')||params.get('error')||params.get('error_description')){
+  // The callback route puts the detail in `auth_error`; Supabase itself may
+  // pass `error_description` / `error` directly. Read all three so the real
+  // reason is never replaced by a generic fallback.
+  const raw=params.get('auth_error')||params.get('error_description')||params.get('error');
+  if(raw){
    setMode('auth');setAuthPage('Login');setAuthNotice('');
-   setAuthError(params.get('error_description')||'Google sign-in could not be completed. Please try again.');
+   let msg=raw;try{msg=decodeURIComponent(raw)}catch{/* keep raw */}
+   if(msg==='could_not_authenticate'){
+    msg='Google sign-in failed: the login code was missing, expired, or already used. Close this page and start the sign-in again from the login screen.';
+   }
+   if(/unable to exchange external code/i.test(msg)){
+    msg+=' — This specific error means Supabase could not swap the Google authorization code, which is almost always a stale Google Client Secret in Supabase → Authentication → Providers → Google. Re-paste the Client ID and Secret there, then retry.';
+   }
+   setAuthError(msg);
    window.history.replaceState({},'','/');
   }
  },[]);
