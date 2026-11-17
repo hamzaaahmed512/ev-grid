@@ -1,0 +1,6 @@
+@EvGrid_HostAddress = http://localhost:5076
+
+GET {{EvGrid_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
