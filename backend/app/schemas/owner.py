@@ -2,8 +2,8 @@
 VoltRelay - Owner Module Pydantic Schemas (Part 2)
 """
 
-from datetime import datetime, time
-from typing import List, Optional
+from datetime import datetime, date, time
+from typing import List, Optional, Dict
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Allowed connector types across the platform
@@ -193,3 +193,76 @@ class OwnerStatusLogResponse(BaseModel):
     new_status: str
     changed_at: datetime
     changed_by_user_id: Optional[int] = None
+
+
+# ─── PART 3: READ-SIDE SCHEMAS (BOOKINGS, EARNINGS, DASHBOARD) ───────────────
+
+class OwnerBookingItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    booking_id: int
+    station_id: int
+    station_name: str
+    connector_id: int
+    connector_label: str
+    driver_name: str
+    start_time: datetime
+    end_time: datetime
+    status: str
+
+
+class OwnerBookingListResponse(BaseModel):
+    bookings: List[OwnerBookingItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class EarningsTotals(BaseModel):
+    estimated_revenue: float
+    estimated_energy_kwh: float
+    completed_bookings: int
+
+
+class EarningsTimeSeriesPoint(BaseModel):
+    date: str
+    period: Optional[str] = None
+    estimated_revenue: float
+    estimated_energy_kwh: float
+    completed_bookings: int
+
+
+class StationEarningsBreakdown(BaseModel):
+    station_id: int
+    station_name: str
+    estimated_revenue: float
+    estimated_energy_kwh: float
+    completed_bookings: int
+
+
+class OwnerEarningsResponse(BaseModel):
+    estimated_revenue: float
+    estimated_energy_kwh: float
+    completed_bookings: int
+    totals: EarningsTotals
+    time_series: List[EarningsTimeSeriesPoint]
+    station_breakdown: List[StationEarningsBreakdown]
+
+
+class StationUtilization(BaseModel):
+    station_id: int
+    station_name: str
+    utilization_percent: float
+    booked_hours: float
+    open_hours: float
+
+
+class OwnerDashboardResponse(BaseModel):
+    total_stations: int
+    total_connectors: int
+    connectors_by_status: Dict[str, int]
+    today_bookings_count: int
+    upcoming_bookings: List[OwnerBookingItem]
+    estimated_revenue_this_month: float
+    estimated_revenue_last_month: float
+    utilization_last_7_days: List[StationUtilization]

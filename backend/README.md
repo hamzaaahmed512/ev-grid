@@ -289,6 +289,181 @@ Soft-delete a connector (`is_active = false`).
 
 ---
 
+### Bookings Endpoints *(Part 3 — Read-Side)*
+
+#### `GET /owner/bookings/upcoming`
+Get the next 10 upcoming `CONFIRMED` bookings with `start_time` in the future, soonest first.
+
+**Response `200`:**
+```json
+[
+  {
+    "booking_id": 105,
+    "station_id": 1,
+    "station_name": "My Downtown Hub",
+    "connector_id": 10,
+    "connector_label": "Bay 1",
+    "driver_name": "Ali Khan",
+    "start_time": "2026-11-18T10:00:00Z",
+    "end_time": "2026-11-18T11:00:00Z",
+    "status": "CONFIRMED"
+  }
+]
+```
+
+---
+
+#### `GET /owner/bookings`
+List bookings across active stations owned by the current user, newest first.
+
+**Query params:**
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `station_id` | int | null | Filter by owned station ID (404 if not owned) |
+| `connector_id` | int | null | Filter by connector ID (404 if not owned) |
+| `status` | string | null | Filter by status (`CONFIRMED`, `CANCELLED`, `COMPLETED`) |
+| `date_from` | date | null | Start date `YYYY-MM-DD` |
+| `date_to` | date | null | End date `YYYY-MM-DD` |
+| `page` | int | 1 | Page number |
+| `page_size` | int | 20 | Items per page (max 100) |
+
+**Validation:**
+- `date_from <= date_to`
+- Range max 366 days
+- `page_size <= 100`
+
+**Response `200`:**
+```json
+{
+  "bookings": [
+    {
+      "booking_id": 101,
+      "station_id": 1,
+      "station_name": "My Downtown Hub",
+      "connector_id": 10,
+      "connector_label": "Bay 1",
+      "driver_name": "Ali Khan",
+      "start_time": "2026-11-17T08:00:00Z",
+      "end_time": "2026-11-17T10:00:00Z",
+      "status": "COMPLETED"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+---
+
+### Analytics & Dashboard Endpoints *(Part 3 — Read-Side)*
+
+#### `GET /owner/earnings`
+Estimated earnings totals, continuous time series (with zero-filled gap points), and per-station breakdown computed from `COMPLETED` bookings.
+
+> **Estimation formulas:**
+> - `estimated_energy_kwh = connector.power_kw * duration_hours`
+> - `estimated_revenue = estimated_energy_kwh * price`
+> - `price = connector.price_per_kwh if set, else station.price_per_kwh, else 0`
+
+**Query params:**
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `date_from` | date | today - 30d | Start date `YYYY-MM-DD` |
+| `date_to` | date | today | End date `YYYY-MM-DD` |
+| `group_by` | string | `"day"` | `"day"` or `"month"` |
+| `station_id` | int | null | Optional station ID filter (404 if not owned) |
+
+**Response `200`:**
+```json
+{
+  "estimated_revenue": 4500.0,
+  "estimated_energy_kwh": 100.0,
+  "completed_bookings": 1,
+  "totals": {
+    "estimated_revenue": 4500.0,
+    "estimated_energy_kwh": 100.0,
+    "completed_bookings": 1
+  },
+  "time_series": [
+    {
+      "date": "2026-11-01",
+      "period": "2026-11-01",
+      "estimated_revenue": 0.0,
+      "estimated_energy_kwh": 0.0,
+      "completed_bookings": 0
+    },
+    {
+      "date": "2026-11-02",
+      "period": "2026-11-02",
+      "estimated_revenue": 4500.0,
+      "estimated_energy_kwh": 100.0,
+      "completed_bookings": 1
+    }
+  ],
+  "station_breakdown": [
+    {
+      "station_id": 1,
+      "station_name": "My Downtown Hub",
+      "estimated_revenue": 4500.0,
+      "estimated_energy_kwh": 100.0,
+      "completed_bookings": 1
+    }
+  ]
+}
+```
+
+---
+
+#### `GET /owner/dashboard`
+Single call returning comprehensive operational KPIs, connector statuses, recent bookings, monthly revenue comparisons, and 7-day utilization.
+
+**Utilization formula:**
+- Booked hours divided by station open hours in percent: `(booked_hours / open_hours) * 100`, capped at 100%.
+- If `open_time`/`close_time` are NULL, assumes 24 hours/day (168 hours per 7 days).
+
+**Response `200`:**
+```json
+{
+  "total_stations": 2,
+  "total_connectors": 5,
+  "connectors_by_status": {
+    "AVAILABLE": 3,
+    "CHARGING": 1,
+    "FAULT": 0,
+    "OFFLINE": 1,
+    "DISABLED": 0
+  },
+  "today_bookings_count": 4,
+  "upcoming_bookings": [
+    {
+      "booking_id": 105,
+      "station_id": 1,
+      "station_name": "My Downtown Hub",
+      "connector_id": 10,
+      "connector_label": "Bay 1",
+      "driver_name": "Ali Khan",
+      "start_time": "2026-11-18T10:00:00Z",
+      "end_time": "2026-11-18T11:00:00Z",
+      "status": "CONFIRMED"
+    }
+  ],
+  "estimated_revenue_this_month": 12500.0,
+  "estimated_revenue_last_month": 9800.0,
+  "utilization_last_7_days": [
+    {
+      "station_id": 1,
+      "station_name": "My Downtown Hub",
+      "utilization_percent": 35.71,
+      "booked_hours": 30.0,
+      "open_hours": 84.0
+    }
+  ]
+}
+```
+
+---
+
 ## Status Logs
 
 The `status_logs` table records every owner-initiated status change:
@@ -319,15 +494,18 @@ backend/
 │   │   ├── user.py             # User model
 │   │   └── booking.py          # Booking model
 │   ├── routers/
-│   │   ├── owner.py            # Owner API endpoints (Part 2)
+│   │   ├── owner.py            # Owner API endpoints (Parts 2 & 3)
 │   │   └── stations.py         # Public driver-facing station endpoints
 │   ├── schemas/
 │   │   └── owner.py            # Pydantic schemas + validation for Owner API
 │   ├── services/
-│   │   └── owner_service.py    # Business logic for Owner API
+│   │   ├── owner_service.py           # Station & connector CRUD (Part 2)
+│   │   ├── owner_bookings_service.py  # Bookings queries & upcoming (Part 3)
+│   │   └── owner_analytics_service.py # Earnings, gap-filling, dashboard (Part 3)
 │   └── main.py
 ├── tests/
-│   ├── test_owner_api.py       # 14 Owner API tests (all isolated, SQLite in-memory)
+│   ├── test_owner_api.py       # 14 Owner API tests (Part 2)
+│   ├── test_owner_reports.py   # 17 Owner Reports & Analytics tests (Part 3)
 │   └── ...
 ├── requirements.txt
 └── README.md
