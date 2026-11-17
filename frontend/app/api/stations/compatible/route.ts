@@ -54,13 +54,13 @@ export async function GET(request: NextRequest) {
     }
 
     const vehicleConnector = normalizeConnectorType(vehicle.connector_type ?? '');
-    const compatible = (stations ?? []).map((station) => {
+    const compatible = (stations ?? []).map((station: any) => {
       const matching = (station.connectors ?? []).some(
         (c: { connector_type: string }) =>
           normalizeConnectorType(c.connector_type ?? '') === vehicleConnector
       );
       return { ...station, is_compatible: matching };
-    }).filter((s) => s.is_compatible);
+    }).filter((s: any) => s.is_compatible);
 
     return NextResponse.json({
       vehicle: {

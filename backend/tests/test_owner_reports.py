@@ -712,3 +712,14 @@ class OwnerReportsTests(unittest.TestCase):
         self.assertNotIn("driver_email", row)
         self.assertNotIn("email", row)
         self.assertNotIn("phone", row)
+
+    # ── TEST 18: Backend Role Discovery (/auth/me returns business_owner) ─────
+
+    def test_auth_me_returns_business_owner_role(self):
+        # Current user is self.owner_a whose role is 'business_owner'
+        res = self.req("GET", "/auth/me")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["role"], "business_owner")
+        self.assertEqual(data["name"], "Owner Alice")
+        self.assertEqual(data["email"], "alice@owner.pk")
