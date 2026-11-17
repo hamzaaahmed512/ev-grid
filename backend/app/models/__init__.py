@@ -4,5 +4,6 @@ from app.models.station import Station
 from app.models.connector import Connector
 from app.models.booking import Booking
 from app.models.charging_session import ChargingSession
+from app.models.status_log import StatusLog
 
-__all__ = ["User", "Vehicle", "Station", "Connector", "Booking", "ChargingSession"]
+__all__ = ["User", "Vehicle", "Station", "Connector", "Booking", "ChargingSession", "StatusLog"]

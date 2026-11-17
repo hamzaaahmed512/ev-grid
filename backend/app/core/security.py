@@ -51,3 +51,21 @@ def decode_supabase_token(token: str) -> Optional[dict]:
         )
     except JWTError:
         return None
+
+
+def create_access_token(data: dict, expires_delta: Optional[object] = None) -> str:
+    """Compatibility helper for tests and token signing."""
+    to_encode = data.copy()
+    if "aud" not in to_encode:
+        to_encode["aud"] = "authenticated"
+    if "email" not in to_encode:
+        to_encode["email"] = f"{to_encode.get('sub', 'user')}@example.com"
+    secret = settings.SUPABASE_JWT_SECRET or getattr(settings, "SECRET_KEY", "default-secret-key")
+    algo = getattr(settings, "ALGORITHM", "HS256")
+    return jwt.encode(to_encode, secret, algorithm=algo)
+
+
+def decode_access_token(token: str) -> Optional[dict]:
+    """Compatibility helper for decoding tokens."""
+    return decode_supabase_token(token)
+

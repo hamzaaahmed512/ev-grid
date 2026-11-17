@@ -71,3 +71,20 @@ def get_current_user(
             raise credentials_exception
 
     return user
+
+
+def require_business_owner(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Enforces that the authenticated user has the 'business_owner' role.
+    Raises 403 Forbidden for any other role.
+    """
+    role = (current_user.role or "").strip().lower()
+    if role != "business_owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Business owner access required.",
+        )
+    return current_user
+

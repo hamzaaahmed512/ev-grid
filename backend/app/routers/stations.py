@@ -51,7 +51,8 @@ def serialize_station(s: Any, matching_connector_type: str | None = None) -> dic
     connectors_list = []
     if hasattr(s, "connectors") and s.connectors:
         for c in s.connectors:
-            connectors_list.append(serialize_connector(c, station_price=price))
+            if getattr(c, "is_active", True) is not False:
+                connectors_list.append(serialize_connector(c, station_price=price))
 
 
     # Determine if compatible with requested filter
@@ -91,6 +92,7 @@ def get_all_stations(
     db: Session = Depends(get_db),
 ):
     query = db.query(Station).options(joinedload(Station.connectors))
+    query = query.filter(Station.is_active == True)
     if city:
         query = query.filter(Station.city.ilike(f"%{city}%"))
     if status_filter:
@@ -134,6 +136,7 @@ def get_compatible_stations(
         db.query(Station)
         .options(joinedload(Station.connectors))
         .join(Connector, Station.id == Connector.station_id)
+        .filter(Station.is_active == True, Connector.is_active == True)
         .filter(Connector.connector_type.ilike(f"%{target_connector}%"))
         .distinct()
         .all()
@@ -164,7 +167,7 @@ def get_station_by_id(station_id: int, db: Session = Depends(get_db)):
     s = (
         db.query(Station)
         .options(joinedload(Station.connectors))
-        .filter(Station.id == station_id)
+        .filter(Station.id == station_id, Station.is_active == True)
         .first()
     )
     if not s:
