@@ -39,7 +39,7 @@ public static class DevDataSeeder
         // 2. 1 B2P station with 3 charging points (Type2 7kW, CCS2 50kW, CCS2 50kW)
         const string stationName = "Apex Gulberg Super Hub";
         var existingStation = await context.Stations
-            .Include(s => s.Points)
+            .Include(s => s.Connectors)
             .FirstOrDefaultAsync(s => s.Name == stationName && s.OwnerId == businessOwner.Id);
 
         if (existingStation == null)
@@ -49,37 +49,17 @@ public static class DevDataSeeder
                 name: stationName,
                 type: StationType.B2P,
                 address: "Plot 12-B, Main Boulevard, Gulberg III, Lahore",
-                latitude: 31.520400m,
-                longitude: 74.358700m,
+                latitude: 31.5204,          // double precision to match DB
+                longitude: 74.3587,
                 openTime: new TimeOnly(6, 0),
                 closeTime: new TimeOnly(23, 0),
                 rating: 4.8m
             );
 
-            // Add 3 charging points using domain method:
-            // Point 1: Type2 7kW
-            station.AddPoint(
-                label: "Bay 1 - AC Fast",
-                connectorType: ConnectorType.Type2,
-                powerKw: 7.00m,
-                pricePerKwh: 45.00m
-            );
-
-            // Point 2: CCS2 50kW
-            station.AddPoint(
-                label: "Bay 2 - DC Super",
-                connectorType: ConnectorType.CCS2,
-                powerKw: 50.00m,
-                pricePerKwh: 65.00m
-            );
-
-            // Point 3: CCS2 50kW
-            station.AddPoint(
-                label: "Bay 3 - DC Super",
-                connectorType: ConnectorType.CCS2,
-                powerKw: 50.00m,
-                pricePerKwh: 65.00m
-            );
+            // Add 3 charging points via domain method:
+            station.AddPoint("Bay 1 - AC Fast", ConnectorType.Type2, 7.00m, 45.00m);
+            station.AddPoint("Bay 2 - DC Super", ConnectorType.CCS2, 50.00m, 65.00m);
+            station.AddPoint("Bay 3 - DC Super", ConnectorType.CCS2, 50.00m, 65.00m);
 
             context.Stations.Add(station);
             await context.SaveChangesAsync();

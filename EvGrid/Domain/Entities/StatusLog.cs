@@ -8,7 +8,11 @@ public class StatusLog
     public int PointId { get; set; }
     public ChargingPoint? Point { get; set; }
 
-    public ChargingPointStatus OldStatus { get; set; }
+    /// <summary>
+    /// Previous status before the change. Nullable — the very first status entry has no prior state.
+    /// </summary>
+    public ChargingPointStatus? OldStatus { get; set; }
+
     public ChargingPointStatus NewStatus { get; set; }
     public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
 
@@ -21,7 +25,7 @@ public class StatusLog
 
     public StatusLog(
         int pointId,
-        ChargingPointStatus oldStatus,
+        ChargingPointStatus? oldStatus,
         ChargingPointStatus newStatus,
         DateTime changedAt,
         int? changedByUserId = null)

@@ -5,25 +5,37 @@ namespace EvGrid.Domain.Entities;
 
 public class Station
 {
-    private TimeOnly _openTime;
-    private TimeOnly _closeTime;
+    private TimeOnly? _openTime;
+    private TimeOnly? _closeTime;
 
     public int Id { get; set; }
-    public int OwnerId { get; set; }
+
+    /// <summary>
+    /// FK to users.id. Nullable — existing 272 rows have no owner yet.
+    /// </summary>
+    public int? OwnerId { get; set; }
     public User? Owner { get; set; }
 
     public string Name { get; set; } = string.Empty;
-    public StationType Type { get; set; }
-    public string Address { get; set; } = string.Empty;
-    public decimal Latitude { get; set; }
-    public decimal Longitude { get; set; }
 
-    public TimeOnly OpenTime
+    /// <summary>
+    /// P2P or B2P. Nullable — existing rows get default 'B2P' via SQL migration.
+    /// </summary>
+    public StationType? Type { get; set; }
+
+    public string? Address { get; set; }
+
+    // DB column type is double precision
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+
+    // DB columns are nullable (new owner-module columns)
+    public TimeOnly? OpenTime
     {
         get => _openTime;
         set
         {
-            if (_closeTime != default && value >= _closeTime)
+            if (value.HasValue && _closeTime.HasValue && value.Value >= _closeTime.Value)
             {
                 throw new DomainException($"OpenTime ({value}) must be earlier than CloseTime ({_closeTime}).");
             }
@@ -31,12 +43,12 @@ public class Station
         }
     }
 
-    public TimeOnly CloseTime
+    public TimeOnly? CloseTime
     {
         get => _closeTime;
         set
         {
-            if (_openTime != default && _openTime >= value)
+            if (value.HasValue && _openTime.HasValue && _openTime.Value >= value.Value)
             {
                 throw new DomainException($"OpenTime ({_openTime}) must be earlier than CloseTime ({value}).");
             }
@@ -49,21 +61,24 @@ public class Station
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
-    // Navigation property
-    public ICollection<ChargingPoint> Points { get; set; } = new List<ChargingPoint>();
+    // Navigation property — maps to connectors table
+    public ICollection<ChargingPoint> Connectors { get; set; } = new List<ChargingPoint>();
 
     // EF Core parameterless constructor
     public Station()
     {
     }
 
+    /// <summary>
+    /// Full constructor for creating a new owner-managed station.
+    /// </summary>
     public Station(
         int ownerId,
         string name,
         StationType type,
         string address,
-        decimal latitude,
-        decimal longitude,
+        double latitude,
+        double longitude,
         TimeOnly openTime,
         TimeOnly closeTime,
         decimal rating = 0m)
@@ -97,6 +112,10 @@ public class Station
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Domain method: add a connector/charging point to this station.
+    /// Enforces P2P ≤ 1 and B2P ≤ 6 limits, plus powerKw and pricePerKwh validation.
+    /// </summary>
     public ChargingPoint AddPoint(string label, ConnectorType connectorType, decimal powerKw, decimal pricePerKwh)
     {
         ValidatePointLimit();
@@ -124,11 +143,14 @@ public class Station
             CreatedAt = DateTime.UtcNow
         };
 
-        Points.Add(point);
+        Connectors.Add(point);
         UpdatedAt = DateTime.UtcNow;
         return point;
     }
 
+    /// <summary>
+    /// Overload accepting a pre-built ChargingPoint — applies same domain rules.
+    /// </summary>
     public void AddPoint(ChargingPoint point)
     {
         ArgumentNullException.ThrowIfNull(point);
@@ -147,18 +169,18 @@ public class Station
 
         point.Station = this;
         point.StationId = Id;
-        Points.Add(point);
+        Connectors.Add(point);
         UpdatedAt = DateTime.UtcNow;
     }
 
     private void ValidatePointLimit()
     {
-        if (Type == StationType.P2P && Points.Count >= 1)
+        if (Type == StationType.P2P && Connectors.Count >= 1)
         {
             throw new DomainException("P2P station can have a maximum of 1 charging point.");
         }
 
-        if (Type == StationType.B2P && Points.Count >= 6)
+        if (Type == StationType.B2P && Connectors.Count >= 6)
         {
             throw new DomainException("B2P station can have a maximum of 6 charging points.");
         }

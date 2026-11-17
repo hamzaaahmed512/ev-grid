@@ -11,7 +11,8 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Station> Stations => Set<Station>();
-    public DbSet<ChargingPoint> ChargingPoints => Set<ChargingPoint>();
+    /// <summary>Maps to the 'connectors' table (each row = one bookable charging plug).</summary>
+    public DbSet<ChargingPoint> Connectors => Set<ChargingPoint>();
     public DbSet<StatusLog> StatusLogs => Set<StatusLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
